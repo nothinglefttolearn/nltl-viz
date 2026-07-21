@@ -1,0 +1,28 @@
+# nltl-viz custom preset config
+# Usage: nltl-viz --config nltl-viz.yaml --preset my-preset track.wav
+#
+# All fields are optional — omit any to get the built-in Preset default.
+# Built-in presets (industrial, subtle, aggressive) are always available
+# without a config file. A preset name here overrides a built-in of the
+# same name; an unrecognized name falls back to searching the built-ins.
+
+presets:
+  - name: my-preset
+    description: Custom preset for NLTL releases
+    motion: deform                # deform | rigid | pulse — there is no --motion flag, this is the only place it's chosen
+    band_count: 32               # number of frequency bands distributed around the perimeter
+    deform_amplitude: 0.35        # motion: deform only: how far the outline pushes out at max energy (0 = no push)
+    scale_amplitude: 0.20         # motion: rigid only: how much the whole shape scales up/down with loudness (0 = static size)
+    pulse_max_opacity: 0.85       # motion: pulse only: opacity ceiling at max loudness (floor is always 0)
+    smoothing_attack: 0.03        # seconds — EMA time constant when the driving signal is rising
+    smoothing_release: 0.25       # seconds — EMA time constant when the driving signal is falling
+    onset_sensitivity: 1.0        # higher = more onsets detected (more flashes) — unused by motion: pulse, which has no flash
+    flash_decay_ms: 200           # fixed flash fade duration in milliseconds — unused by motion: pulse
+    flash_size: 0.18              # peak size of the reactive element: fraction of half the canvas (deform) or fraction of the outer shape's own extent (rigid) — unused by motion: pulse
+    flash_intensity_scale: 1.0    # peak flash brightness multiplier — unused by motion: pulse
+    bass_color: "#6E5470"         # reactive element's color when spectral centroid is bass-heavy — unused by motion: pulse
+    treble_color: "#2E8C8A"       # reactive element's color when spectral centroid is treble-heavy — unused by motion: pulse
+    grain_strength: 14            # film grain noise stddev (0 = no grain)
+    vignette_fraction: 0.45       # vignette darkness at the corners (0 = none, 1 = max)
+    background_color: "#0A0A0C"   # flat background color (non-reactive)
+    outline_color: "#D8D8D2"      # outer shape's color: stroke (deform), solid fill (rigid), or opacity-pulsed solid fill (pulse) — fixed, not audio-reactive itself
