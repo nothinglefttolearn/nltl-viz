@@ -1,6 +1,6 @@
 # nltl-viz
 
-A CLI tool for generating audio-reactive music visualization video clips from a short audio file. Fully generative — no image input. The chosen shape (the NLTL face, or NLTL space — its inverse) reacts to the track according to its preset's motion style — see [Motion styles](#motion-styles) below.
+A CLI tool for generating audio-reactive music visualization video clips from a short audio file. Fully generative — no image input. The chosen shape (the NLTL face, or NLTL space — its inverse) reacts to the track according to its preset's motion style — see [Motion styles](#motion-styles) below. Preset (motion tuning), palette (color), and layout (single shape or a 2x2 grid of four) are independent settings that combine freely — see [Presets, palettes, and layout](#presets-palettes-and-layout).
 
 Point it at a video file instead of an audio file and it switches to overlay mode: the same visualization, transparent everywhere except the shape/flash, composited on top of the video using the video's own audio track for analysis.
 
@@ -27,23 +27,26 @@ nltl-viz [audio|video] [flags]
 # Preview 10 seconds before committing to a full render
 nltl-viz --preset industrial --preview demo.wav
 
-# Full render
-nltl-viz --preset aggressive demo.wav
+# Full render, NLTL violet on a light background
+nltl-viz --preset aggressive --palette violet demo.wav
 
-# Custom preset from a config file
-nltl-viz --config nltl-viz.yaml --preset my-preset demo.wav
+# 2x2 grid of four identical shape copies
+nltl-viz --layout grid demo.wav
+
+# Custom preset/palette from a config file
+nltl-viz --config nltl-viz.yaml --preset my-preset --palette my-palette demo.wav
 
 # Render the inverse shape, NLTL space
 nltl-viz --shape space demo.wav
 
 # Overlay onto a video file instead — same flags, auto-detected by extension
-nltl-viz --preset aggressive performance.mp4
+nltl-viz --preset aggressive --palette teal performance.mp4
 
-# Interactive mode — prompts for audio file, preset, and shape
+# Interactive mode — prompts for audio file, preset, palette, layout, and shape
 nltl-viz
 ```
 
-Motion (`deform`/`rigid`/`pulse`) isn't a flag — it comes from whichever preset you pick. Run `nltl-viz presets` to see each preset's motion.
+Motion (`deform`/`rigid`/`pulse`) isn't a flag — it comes from whichever preset you pick. Run `nltl-viz presets` to see each preset's motion, and `nltl-viz palettes` to see each palette's colors.
 
 Output files are saved alongside the input file, named `{name}_viz_{timestamp}.mp4` for an audio input (or `{name}_viz_preview_{timestamp}.mp4` for `--preview`), and `{name}_viz-overlay_{timestamp}.mp4` for a video input (`{name}_viz-overlay_preview_{timestamp}.mp4` for `--preview`) — each render gets its own file so re-running with different settings never overwrites a previous output.
 
@@ -51,27 +54,47 @@ Output files are saved alongside the input file, named `{name}_viz_{timestamp}.m
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--preset`, `-p` | `industrial` | Visual preset — also determines motion (`deform`/`rigid`/`pulse`), see below |
+| `--preset`, `-p` | `industrial` | Motion-tuning preset — also determines motion (`deform`/`rigid`/`pulse`), see below |
+| `--palette` | `black` | Color palette — background, outline, and flash colors |
+| `--layout` | `single` | Canvas arrangement: `single` shape, or a 2x2 `grid` of four identical copies |
 | `--shape` | `face` | Shape to visualize: `face` or `space` (its inverse) |
 | `--preview` | `false` | Render a 10s low-quality preview to check the look |
 | `--output-dir`, `-o` | same as input | Where to write the output file |
-| `--config`, `-c` | — | YAML file with custom presets |
+| `--config`, `-c` | — | YAML file with custom presets and/or palettes |
 | `--verbose`, `-v` | `false` | Show raw ffmpeg output during render |
 
-## Presets
+## Presets, palettes, and layout
+
+Preset (motion tuning), palette (color), and layout (canvas arrangement) are independent settings — any preset combines with any palette and either layout.
+
+### Presets
 
 | Name | Motion | Description |
 |------|--------|--------------|
 | `industrial` | `deform` | Moderate deform, medium onset sensitivity |
 | `subtle` | `deform` | Calmer, slower breathing, lighter grain/vignette |
-| `3d-glasses` | `deform` | Red bass color, cyan treble color, light background, dark outline |
 | `aggressive` | `deform` | Punchier deform and flash, faster attack, heavier grain/vignette |
 
 Run `nltl-viz presets` to list them (with their motion). A preset's own `motion` field is what a `--config` YAML entry uses to select `deform`/`rigid`/`pulse` — see `nltl-viz.yaml.example`.
 
-## Custom Presets
+### Palettes
 
-Copy `nltl-viz.yaml.example` to `nltl-viz.yaml` and edit the values — see that file for a full field reference. Custom presets fall back to built-ins if the name isn't found in the config file.
+| Name | Description |
+|------|--------------|
+| `black` | Dark background, off-white outline, flash lerps NLTL violet to teal by spectral centroid |
+| `violet` | Neutral off-white background, NLTL violet (`#6E5470`) outline and flash |
+| `teal` | Neutral off-white background, NLTL teal (`#2E8C8A`) outline and flash |
+
+`black` is the only palette with a two-color (duotone) flash — `violet`/`teal` are monochrome: one accent color throughout, no centroid-driven lerp. Run `nltl-viz palettes` to list them.
+
+### Layout
+
+- `single` (default) — one shape, centered in the frame.
+- `grid` — the frame is split into a fixed 2x2, with four identical copies of the shape, all driven by the same full-spectrum signal (not a spectral split per quadrant).
+
+## Custom presets and palettes
+
+Copy `nltl-viz.yaml.example` to `nltl-viz.yaml` and edit the values — see that file for a full field reference. Custom presets and palettes each fall back to built-ins if the name isn't found in the config file.
 
 ## Shapes
 
@@ -89,12 +112,12 @@ Motion isn't a flag — each preset's `motion` field fixes which one it uses (se
 ## How it reacts to audio
 
 - Each detected onset (a "hit") triggers the reactive element (a soft gradient blob in `deform`, a smaller solid copy of the shape in `rigid`) with a fixed-duration decay; a harder hit is brighter/larger, but every flash fades at the same rate. `pulse` has no onset-triggered flash at all.
-- Its color is a live blend between two configurable colors, driven by the track's spectral centroid — bass-heavy moments skew toward `bass_color`, treble-heavy moments skew toward `treble_color`. `pulse` uses neither — it's one flat `outline_color` throughout.
+- Its color is a live blend between the palette's `flash_primary_color` and `flash_secondary_color`, driven by the track's spectral centroid — bass-heavy moments skew toward the primary color, treble-heavy moments skew toward the secondary. A palette with no `flash_secondary_color` (e.g. `violet`, `teal`) is monochrome — the flash stays the primary color regardless of centroid. `pulse` uses neither — it's one flat `outline_color` throughout.
 - Grain and vignette are applied as a post-process over every frame (no image input, no desaturation pass — the palette is deliberately muted already).
 
 ## Video overlay
 
-Passing a video file (`.mp4`, `.mov`, `.mkv`, `.avi`, `.m4v`, `.webm`) instead of an audio file switches to overlay mode automatically — same flags, same presets, same shape/motion logic, no separate command:
+Passing a video file (`.mp4`, `.mov`, `.mkv`, `.avi`, `.m4v`, `.webm`) instead of an audio file switches to overlay mode automatically — same flags, same presets/palettes/layouts, same shape/motion logic, no separate command:
 
 ```bash
 nltl-viz --preset aggressive performance.mp4
@@ -121,7 +144,7 @@ The pipeline runs as four independent stages, each owned by a different library,
 | Video I/O | `video.py` | [ffmpeg](https://ffmpeg.org)/`ffprobe` (subprocess) | Overlay-mode only: probes a source video's resolution/frame rate, extracts its audio to a temp WAV for analysis, decodes its frames to raw RGB, and alpha-composites each rendered viz frame over the corresponding video frame (`fg_premultiplied + bg * (1 - alpha)`). |
 | Encoding | `encode.py` | [ffmpeg](https://ffmpeg.org) (subprocess) | Muxes the piped raw RGB24 frames (composited, in overlay mode) with the audio track — the original audio file re-encoded to AAC in audio-only mode, or the source video's own audio track stream-copied unchanged in overlay mode. ffmpeg does no filtering or effects work — it's a dumb encoder/decoder, all image work already happened in Python. |
 
-Supporting modules: `preset.py`/`config.py` define and load the numeric fields (`deform_amplitude`, `flash_decay_ms`, colors, etc.) that `audio.py` and `render.py` read; `cli.py` (built on [typer](https://typer.tiangolo.com)) wires the stages together per-frame, dispatches to audio-only or overlay mode based on the input file's extension, and exposes the flags documented above; `interactive.py` (built on [questionary](https://questionary.readthedocs.io)) is the prompt-driven entry point used when no file is passed on the command line — audio files only.
+Supporting modules: `preset.py` defines the motion-tuning numeric fields (`deform_amplitude`, `flash_decay_ms`, etc.) that `audio.py` and `render.py` read; `palette.py` defines the color fields (`background_color`, `outline_color`, `flash_primary_color`/`flash_secondary_color`) `render.py` and `audio.py`'s flash-color lerp read; `config.py` loads both from a `--config` YAML file; `cli.py` (built on [typer](https://typer.tiangolo.com)) wires the stages together per-frame, dispatches to audio-only or overlay mode based on the input file's extension, and exposes the flags documented above; `interactive.py` (built on [questionary](https://questionary.readthedocs.io)) is the prompt-driven entry point used when no file is passed on the command line — audio files only.
 
 ### What reacts to audio, and where it's computed
 
@@ -129,7 +152,7 @@ All audio reactivity is resolved once in `audio.py` before any frame is drawn �
 
 - Shape motion — `deform` reads per-band energy; `rigid` and `pulse` both read the RMS loudness envelope (`rigid` for scale, `pulse` for fill opacity).
 - Flash brightness — reads onset strength/timing (decayed per frame, combined across overlapping onsets with an elementwise `max`).
-- Flash/gradient color — reads spectral centroid, blended between `bass_color` and `treble_color`.
+- Flash/gradient color — reads spectral centroid, blended between the palette's `flash_primary_color` and `flash_secondary_color` (constant at `flash_primary_color` when a palette has no secondary color).
 
 ## Development
 
