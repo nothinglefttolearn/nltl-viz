@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 mise-managed (mise pins Python/uv/ffmpeg and defines tasks; uv resolves deps underneath). Run from this directory:
 
 ```bash
-mise run sync                    # install deps (needs: brew install cairo pkg-config)
+mise run sync                    # install deps (needs: mise run setup, once, for Cairo)
 mise run test                    # run all tests
 mise run test -- tests/test_ema.py::test_constant_input_is_steady_state   # single test
 mise run lint                    # lint

@@ -1,7 +1,7 @@
 [tools]
 python = "3.14"
-uv = "latest"
-ffmpeg = "latest" # provides ffprobe too
+uv = "0.12.19"
+ffmpeg = "9.0.2" # provides ffprobe too
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -32,3 +32,7 @@ run = "uv run ruff format ."
 description = "Run nltl-viz (e.g. mise run viz -- --preview demo.wav)"
 depends = ["sync"]
 run = "uv run nltl-viz"
+
+[tasks.setup]
+description = "Install system libraries (Cairo, pkgconf) via Homebrew"
+run = "brew bundle"

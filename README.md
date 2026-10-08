@@ -8,7 +8,7 @@ Point it at a video file instead of an audio file and it switches to overlay mod
 
 - [mise](https://mise.jdx.dev/) (installs the pinned Python, uv, and ffmpeg from `mise.toml`; uv resolves dependencies underneath)
 - [ffmpeg](https://ffmpeg.org) in your PATH (mise installs it for you) (`ffprobe`, installed alongside it, is required too — used to read a source video's resolution/frame rate for overlay mode)
-- Cairo + pkg-config (pycairo builds against system Cairo): `brew install cairo pkg-config` on macOS
+- Cairo + pkgconf (pycairo builds against system Cairo): `mise run setup` on macOS (runs `brew bundle` against the `Brewfile`)
 
 ## Install
 
