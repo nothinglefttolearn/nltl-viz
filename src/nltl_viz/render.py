@@ -5,6 +5,7 @@ from enum import Enum
 import cairo
 import numpy as np
 
+from nltl_viz.palette import Palette
 from nltl_viz.preset import Preset
 
 _BASE_HALF_FRACTION = 0.35
@@ -21,6 +22,12 @@ class Motion(str, Enum):
     deform = "deform"
     rigid = "rigid"
     pulse = "pulse"
+    split = "split"
+
+
+class Layout(str, Enum):
+    single = "single"
+    grid = "grid"
 
 
 def cosine_interp_cyclic(values: np.ndarray, t: np.ndarray | float) -> np.ndarray:
@@ -167,6 +174,50 @@ def pulse_polygon_points(
     return vertices, centroid
 
 
+def _intersect_horizontal(p0: np.ndarray, p1: np.ndarray, y: float) -> np.ndarray:
+    t = (y - p0[1]) / (p1[1] - p0[1])
+    return np.array([p0[0] + t * (p1[0] - p0[0]), y])
+
+
+def _clip_polygon_half_plane(vertices: np.ndarray, y: float, *, keep_below: bool) -> np.ndarray:
+    """Sutherland-Hodgman clip of `vertices` against the horizontal
+    half-plane y <= `y` (keep_below=True) or y >= `y` (keep_below=False).
+    Clipping against a single half-plane is valid for concave subject
+    polygons too (e.g. Shape.space's reflex vertex) — the artifacts
+    Sutherland-Hodgman can produce on concave *subjects* only show up when
+    clipping against a multi-edge convex window, not a single straight
+    line."""
+    output: list[np.ndarray] = []
+    n = len(vertices)
+    for i in range(n):
+        curr, prev = vertices[i], vertices[i - 1]
+        curr_in = (curr[1] <= y) if keep_below else (curr[1] >= y)
+        prev_in = (prev[1] <= y) if keep_below else (prev[1] >= y)
+        if curr_in:
+            if not prev_in:
+                output.append(_intersect_horizontal(prev, curr, y))
+            output.append(curr)
+        elif prev_in:
+            output.append(_intersect_horizontal(prev, curr, y))
+    return np.array(output, dtype=np.float64) if output else np.empty((0, 2), dtype=np.float64)
+
+
+def split_polygon_points(
+    size: int, shape: Shape = Shape.face, *, offset: tuple[float, float] = (0.0, 0.0)
+) -> tuple[np.ndarray, np.ndarray]:
+    """`Motion.split`'s geometry: the plain, undistorted shape cut along the
+    horizontal midline of its own bounding box (symmetric around `size / 2`,
+    the same basis `_BASE_HALF_FRACTION` centers on) into a top half and a
+    bottom half — each a standalone closed polygon, ready to be translated
+    independently and stroked. No deformation, no scaling; the only motion
+    is each half's rigid horizontal offset, applied by the caller."""
+    vertices = _polygon_vertices(size, shape) + np.array(offset)
+    y_mid = offset[1] + size / 2.0
+    top = _clip_polygon_half_plane(vertices, y_mid, keep_below=True)
+    bottom = _clip_polygon_half_plane(vertices, y_mid, keep_below=False)
+    return top, bottom
+
+
 def _hex_to_rgb01(hex_color: str) -> tuple[float, float, float]:
     h = hex_color.lstrip("#")
     return tuple(int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
@@ -230,48 +281,81 @@ def draw_inner_shape(
     _fill_polygon(ctx, points, rgb01)
 
 
-def draw_frame(
+def _paint_background(ctx: cairo.Context, palette: Palette, transparent_background: bool) -> None:
+    if transparent_background:
+        return
+    bg = _hex_to_rgb01(palette.background_color)
+    ctx.set_source_rgb(*bg)
+    ctx.paint()
+
+
+def draw_shape_instance(
     ctx: cairo.Context,
     points: np.ndarray,
     flash_brightness: float,
     flash_color: tuple[float, float, float],
     preset: Preset,
+    palette: Palette,
     size: int,
     center: tuple[float, float],
     shape: Shape = Shape.face,
     motion: Motion = Motion.deform,
     *,
-    transparent_background: bool = False,
     opacity: float = 0.0,
 ) -> None:
-    if not transparent_background:
-        bg = _hex_to_rgb01(preset.background_color)
-        ctx.set_source_rgb(*bg)
-        ctx.paint()
-
+    """Draws one shape copy (fill/stroke + its flash) onto `ctx`. Background
+    painting is a separate, canvas-wide step (`_paint_background`) so
+    `Layout.grid` can paint once and call this once per quadrant."""
     if motion == Motion.pulse:
         # No flash, no bass/treble centroid color — the whole shape's alpha
         # is the only reactive element in this mode.
-        outline_rgb = _hex_to_rgb01(preset.outline_color)
+        outline_rgb = _hex_to_rgb01(palette.outline_color)
         _fill_polygon(ctx, points, outline_rgb, opacity)
         return
 
     if motion == Motion.rigid:
-        outline_rgb = _hex_to_rgb01(preset.outline_color)
+        outline_rgb = _hex_to_rgb01(palette.outline_color)
         _fill_polygon(ctx, points, outline_rgb)
         draw_inner_shape(ctx, flash_brightness, flash_color, preset, size, center, shape)
         return
 
     draw_flash(ctx, flash_brightness, flash_color, preset, size, center)
 
-    outline_rgb = _hex_to_rgb01(preset.outline_color)
-    ctx.set_source_rgb(*outline_rgb)
-    ctx.set_line_width(max(1.0, size * 0.004))
+    outline_rgb = _hex_to_rgb01(palette.outline_color)
+    _stroke_polygon(ctx, points, outline_rgb, max(1.0, size * 0.004))
+
+
+def _stroke_polygon(
+    ctx: cairo.Context, points: np.ndarray, color: tuple[float, float, float], line_width: float
+) -> None:
+    ctx.set_source_rgb(*color)
+    ctx.set_line_width(line_width)
     ctx.move_to(points[0, 0], points[0, 1])
     for px, py in points[1:]:
         ctx.line_to(px, py)
     ctx.close_path()
     ctx.stroke()
+
+
+def draw_split_instance(
+    ctx: cairo.Context,
+    top_points: np.ndarray,
+    bottom_points: np.ndarray,
+    dx: float,
+    palette: Palette,
+    size: int,
+) -> None:
+    """`Motion.split`: strokes the top half shifted `-dx` in x and the
+    bottom half shifted `+dx`, so the two halves — flush at dx=0 — slide
+    apart horizontally as `dx` grows. No flash, no per-band color — the
+    slide distance is the only reactive element, deliberately as minimal as
+    `Motion.pulse`'s single opacity mechanic."""
+    outline_rgb = _hex_to_rgb01(palette.outline_color)
+    line_width = max(1.0, size * 0.004)
+    for points, shift in ((top_points, -dx), (bottom_points, dx)):
+        if len(points) == 0:
+            continue
+        _stroke_polygon(ctx, points + np.array([shift, 0.0]), outline_rgb, line_width)
 
 
 def surface_to_rgb24(
@@ -308,48 +392,87 @@ def surface_to_rgba_premultiplied(
     return np.ascontiguousarray(rgba)
 
 
+def _layout_instances(
+    layout: Layout, w: int, h: int, size: int
+) -> list[tuple[int, tuple[float, float]]]:
+    """One (instance_size, offset) pair per shape copy to draw.
+
+    `Layout.single` reuses the caller's own `size` (already `min(w, h)` by
+    convention — see `_frame_generator`/`_overlay_frame_generator`), centered
+    in the full canvas.
+
+    `Layout.grid` ignores that `size` and re-derives a quadrant-fit size
+    directly from the canvas dimensions, since each quadrant's own space —
+    not the single-shape basis size the caller computed — is what should
+    drive its scale. Fixed at a 2x2 grid (4 identical copies)."""
+    if layout == Layout.single:
+        offset = ((w - size) / 2.0, (h - size) / 2.0)
+        return [(size, offset)]
+
+    qw, qh = w / 2.0, h / 2.0
+    instance_size = int(min(qw, qh))
+    local_offset = ((qw - instance_size) / 2.0, (qh - instance_size) / 2.0)
+    return [
+        (instance_size, (col * qw + local_offset[0], row * qh + local_offset[1]))
+        for row in range(2)
+        for col in range(2)
+    ]
+
+
 def render_frame(
     band_values: np.ndarray,
     flash_brightness: float,
     flash_color: tuple[float, float, float],
     preset: Preset,
+    palette: Palette,
     size: int,
     shape: Shape = Shape.face,
     motion: Motion = Motion.deform,
     scale_value: float = 0.5,
+    layout: Layout = Layout.single,
     *,
     width: int | None = None,
     height: int | None = None,
     transparent_background: bool = False,
 ) -> np.ndarray:
     """Renders one frame onto a `width`x`height` canvas (defaulting to a
-    `size`x`size` square when unset), with the shape itself always sized and
-    proportioned off `size` and centered in the canvas — so a wider canvas
-    just extends the (transparent, in overlay mode) area around the shape
-    rather than stretching it."""
+    `size`x`size` square when unset). Under `Layout.single` the shape is
+    sized and proportioned off `size` and centered in the canvas — so a
+    wider canvas just extends the (transparent, in overlay mode) area around
+    the shape rather than stretching it. Under `Layout.grid`, 4 identical
+    copies are drawn, one per quadrant, all driven by the same
+    `band_values`/`flash_brightness`/`flash_color`/`scale_value`."""
     w = width if width is not None else size
     h = height if height is not None else size
-    offset = ((w - size) / 2.0, (h - size) / 2.0)
 
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
     ctx = cairo.Context(surface)
+    _paint_background(ctx, palette, transparent_background)
 
-    opacity = 0.0
-    if motion == Motion.pulse:
-        points, centroid = pulse_polygon_points(size, shape, offset=offset)
-        opacity = preset.pulse_max_opacity * scale_value
-    elif motion == Motion.rigid:
-        scale = 1.0 + preset.scale_amplitude * (scale_value - 0.5) * 2.0
-        points, centroid = scaled_polygon_points(size, shape, scale, offset=offset)
-    else:
-        points, centroid = deformed_polygon_points(
-            band_values, size, preset.deform_amplitude, shape, offset=offset
+    for instance_size, offset in _layout_instances(layout, w, h, size):
+        if motion == Motion.split:
+            top_points, bottom_points = split_polygon_points(instance_size, shape, offset=offset)
+            dx = preset.split_amplitude * instance_size * scale_value
+            draw_split_instance(ctx, top_points, bottom_points, dx, palette, instance_size)
+            continue
+
+        opacity = 0.0
+        if motion == Motion.pulse:
+            points, centroid = pulse_polygon_points(instance_size, shape, offset=offset)
+            opacity = preset.pulse_max_opacity * scale_value
+        elif motion == Motion.rigid:
+            scale = 1.0 + preset.scale_amplitude * (scale_value - 0.5) * 2.0
+            points, centroid = scaled_polygon_points(instance_size, shape, scale, offset=offset)
+        else:
+            points, centroid = deformed_polygon_points(
+                band_values, instance_size, preset.deform_amplitude, shape, offset=offset
+            )
+
+        draw_shape_instance(
+            ctx, points, flash_brightness, flash_color, preset, palette, instance_size, centroid,
+            shape, motion, opacity=opacity,
         )
 
-    draw_frame(
-        ctx, points, flash_brightness, flash_color, preset, size, centroid, shape, motion,
-        transparent_background=transparent_background, opacity=opacity,
-    )
     if transparent_background:
         return surface_to_rgba_premultiplied(surface, w, h)
     return surface_to_rgb24(surface, w, h)

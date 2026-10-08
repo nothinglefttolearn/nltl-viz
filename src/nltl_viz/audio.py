@@ -7,6 +7,7 @@ from pathlib import Path
 import librosa
 import numpy as np
 
+from nltl_viz.palette import Palette
 from nltl_viz.preset import Preset
 
 _N_FFT = 2048
@@ -33,7 +34,7 @@ class AudioAnalysis:
     flash_color: np.ndarray
 
 
-def analyze(audio_path: Path, preset: Preset, fps: int = 30) -> AudioAnalysis:
+def analyze(audio_path: Path, preset: Preset, palette: Palette, fps: int = 30) -> AudioAnalysis:
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
     duration_sec = float(librosa.get_duration(y=y, sr=sr))
     n_frames = max(1, math.ceil(duration_sec * fps))
@@ -58,7 +59,7 @@ def analyze(audio_path: Path, preset: Preset, fps: int = 30) -> AudioAnalysis:
     rms_norm = _resize_to_frames(rms_norm, n_frames)
     scale_envelope = _ema_smooth(rms_norm, preset.smoothing_attack, preset.smoothing_release, fps)
 
-    flash_brightness, flash_color = precompute_flash_signal(onsets, centroid, n_frames, fps, preset)
+    flash_brightness, flash_color = precompute_flash_signal(onsets, centroid, n_frames, fps, preset, palette)
 
     return AudioAnalysis(
         sample_rate=sr,
@@ -173,7 +174,12 @@ def lerp_color(bass_hex: str, treble_hex: str, t: np.ndarray | float) -> np.ndar
 
 
 def precompute_flash_signal(
-    onsets: list[OnsetEvent], centroid: np.ndarray, n_frames: int, fps: int, preset: Preset
+    onsets: list[OnsetEvent],
+    centroid: np.ndarray,
+    n_frames: int,
+    fps: int,
+    preset: Preset,
+    palette: Palette,
 ) -> tuple[np.ndarray, np.ndarray]:
     brightness = np.zeros(n_frames, dtype=np.float64)
     decay_rate = math.log(20.0) / max(preset.flash_decay_ms, 1e-6)
@@ -190,5 +196,8 @@ def precompute_flash_signal(
             if contribution > brightness[j]:
                 brightness[j] = contribution
 
-    color = lerp_color(preset.bass_color, preset.treble_color, centroid)
+    # A palette with no flash_secondary_color lerps primary->primary, i.e.
+    # a constant color regardless of centroid — monochrome, no special case.
+    secondary = palette.flash_secondary_color or palette.flash_primary_color
+    color = lerp_color(palette.flash_primary_color, secondary, centroid)
     return brightness, color
