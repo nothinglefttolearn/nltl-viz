@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import math
 import tempfile
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Optional
 
 import numpy as np
 import typer
@@ -121,8 +121,8 @@ def run_render(
     palette_name: str,
     layout: Layout,
     shape: Shape,
-    output_dir: Optional[Path],
-    config_path: Optional[Path],
+    output_dir: Path | None,
+    config_path: Path | None,
     preview: bool,
     verbose: bool,
 ) -> None:
@@ -164,8 +164,8 @@ def run_overlay(
     palette_name: str,
     layout: Layout,
     shape: Shape,
-    output_dir: Optional[Path],
-    config_path: Optional[Path],
+    output_dir: Path | None,
+    config_path: Path | None,
     preview: bool,
     verbose: bool,
 ) -> None:
@@ -207,7 +207,7 @@ def run_overlay(
     video_frames = video_mod.decode_frames(video_path, probe.width, probe.height, total_frames)
     composited = (
         video_mod.composite_over(video_frame, viz_frame)
-        for video_frame, viz_frame in zip(video_frames, viz_frames)
+        for video_frame, viz_frame in zip(video_frames, viz_frames, strict=False)
     )
 
     cmd = encode.build_overlay_ffmpeg_cmd(
@@ -252,7 +252,7 @@ def default_callback(ctx: typer.Context) -> None:
 
 @app.command(DEFAULT_COMMAND, hidden=True)
 def render_cmd(
-    input_path: Optional[Path] = typer.Argument(
+    input_path: Path | None = typer.Argument(
         None, help="Path to the input audio file, or a video file to overlay the visualization onto"
     ),
     preset: str = typer.Option("industrial", "--preset", "-p", help="Motion-tuning preset"),
@@ -260,8 +260,8 @@ def render_cmd(
     layout: Layout = typer.Option(Layout.single, "--layout", help="Canvas arrangement: single or grid"),
     shape: Shape = typer.Option(Shape.face, "--shape", help="Shape to visualize: face or space"),
     preview: bool = typer.Option(False, "--preview", help="Render a 10s low-quality preview"),
-    output_dir: Optional[Path] = typer.Option(None, "--output-dir", "-o", help="Output directory"),
-    config_path: Optional[Path] = typer.Option(
+    output_dir: Path | None = typer.Option(None, "--output-dir", "-o", help="Output directory"),
+    config_path: Path | None = typer.Option(
         None, "--config", "-c", help="YAML file with custom presets and/or palettes"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show raw ffmpeg output during render"),

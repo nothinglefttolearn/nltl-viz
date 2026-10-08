@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-uv-managed. Run from this directory:
+mise-managed (mise pins Python/uv/ffmpeg and defines tasks; uv resolves deps underneath). Run from this directory:
 
 ```bash
-uv sync --group dev              # install deps (needs: brew install cairo pkg-config)
-uv run pytest                    # run all tests
-uv run pytest tests/test_ema.py::test_constant_input_is_steady_state   # single test
-uv run ruff check .              # lint
-uv run nltl-viz --preview demo.wav
+mise run sync                    # install deps (needs: brew install cairo pkg-config)
+mise run test                    # run all tests
+mise run test -- tests/test_ema.py::test_constant_input_is_steady_state   # single test
+mise run lint                    # lint
+mise run viz -- --preview demo.wav
 ```
 
 ## Architecture

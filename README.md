@@ -6,15 +6,16 @@ Point it at a video file instead of an audio file and it switches to overlay mod
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/) (manages the Python version and dependencies)
-- [ffmpeg](https://ffmpeg.org) in your PATH (`ffprobe`, installed alongside it, is required too — used to read a source video's resolution/frame rate for overlay mode)
+- [mise](https://mise.jdx.dev/) (installs the pinned Python, uv, and ffmpeg from `mise.toml`; uv resolves dependencies underneath)
+- [ffmpeg](https://ffmpeg.org) in your PATH (mise installs it for you) (`ffprobe`, installed alongside it, is required too — used to read a source video's resolution/frame rate for overlay mode)
 - Cairo + pkg-config (pycairo builds against system Cairo): `brew install cairo pkg-config` on macOS
 
 ## Install
 
 ```bash
 cd nltl-viz
-uv sync
+mise trust && mise install
+mise run sync
 ```
 
 ## Usage
@@ -157,6 +158,8 @@ All audio reactivity is resolved once in `audio.py` before any frame is drawn �
 ## Development
 
 ```bash
-uv sync --group dev
-uv run pytest
+mise run sync
+mise run test              # or: mise run test -- tests/test_ema.py
+mise run lint
+mise run viz -- --preview demo.wav
 ```
