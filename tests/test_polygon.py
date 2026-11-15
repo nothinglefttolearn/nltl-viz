@@ -1,34 +1,40 @@
+import nltl_values
 import numpy as np
 
 from nltl_viz.render import (
     Shape,
-    _face_vertices,
     _polygon_centroid,
     _polygon_perimeter_points,
     _polygon_vertices,
-    _space_vertices,
     deformed_polygon_points,
     scaled_polygon_points,
 )
 
 
-def test_vertices_match_expected_geometry():
-    size = 300
-    vertices = _polygon_vertices(size)
-    cx = cy = size / 2.0
-    half = 0.35 * size
-    x0, y0 = cx - half, cy - half
-    side = 2.0 * half
+def _face_vertices(size: int) -> np.ndarray:
+    return _polygon_vertices(size, Shape.face)
 
-    expected = np.array(
-        [
-            (x0, y0),
-            (x0 + (2.0 / 3.0) * side, y0 + (1.0 / 3.0) * side),
-            (x0 + (2.0 / 3.0) * side, y0 + side),
-            (x0, y0 + side),
-        ]
-    )
-    assert np.allclose(vertices, expected)
+
+def _space_vertices(size: int) -> np.ndarray:
+    return _polygon_vertices(size, Shape.space)
+
+
+def _expected_in_bounding_square(shape: Shape, size: int) -> np.ndarray:
+    half = 0.35 * size
+    x0 = y0 = size / 2.0 - half
+    side = 2.0 * half
+    unit = np.array(nltl_values.shape(shape.value).points)
+    return np.array([x0, y0]) + unit * side
+
+
+def test_every_shape_exists_in_nltl_values():
+    for shape in Shape:
+        assert shape.value in nltl_values.shape_names()
+
+
+def test_vertices_match_nltl_values_mapped_into_bounding_square():
+    size = 300
+    assert np.allclose(_polygon_vertices(size), _expected_in_bounding_square(Shape.face, size))
 
 
 def test_centroid_is_within_bounding_extent():
@@ -84,31 +90,24 @@ def test_deformation_scales_from_returned_centroid():
     assert np.allclose(points[:, 1], expected_y)
 
 
-def test_polygon_vertices_dispatches_on_shape():
+def test_polygon_vertices_defaults_to_face():
+    assert np.allclose(_polygon_vertices(300), _polygon_vertices(300, Shape.face))
+
+
+def test_space_matches_nltl_values_mapped_into_bounding_square():
     size = 300
-    assert np.allclose(_polygon_vertices(size, Shape.face), _face_vertices(size))
-    assert np.allclose(_polygon_vertices(size, Shape.space), _space_vertices(size))
-    # default (no shape arg) is face, for backwards compatibility
-    assert np.allclose(_polygon_vertices(size), _face_vertices(size))
+    assert np.allclose(_space_vertices(size), _expected_in_bounding_square(Shape.space, size))
 
 
-def test_space_is_pentagon_matching_square_minus_face():
+def test_face_and_space_tile_the_bounding_square():
     size = 300
-    cx = cy = size / 2.0
-    half = 0.35 * size
-    x0, y0 = cx - half, cy - half
-    side = 2.0 * half
+    side = 2.0 * 0.35 * size
 
-    expected = np.array(
-        [
-            (x0, y0),
-            (x0 + side, y0),
-            (x0 + side, y0 + side),
-            (x0 + (2.0 / 3.0) * side, y0 + side),
-            (x0 + (2.0 / 3.0) * side, y0 + (1.0 / 3.0) * side),
-        ]
-    )
-    assert np.allclose(_space_vertices(size), expected)
+    def area(v):
+        x, y = v[:, 0], v[:, 1]
+        return abs((x * np.roll(y, -1) - np.roll(x, -1) * y).sum()) / 2.0
+
+    assert np.isclose(area(_face_vertices(size)) + area(_space_vertices(size)), side * side)
 
 
 def test_face_and_space_share_the_cut_boundary_exactly():

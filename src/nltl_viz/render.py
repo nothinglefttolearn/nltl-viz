@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
+from functools import cache
 
 import cairo
+import nltl_values
 import numpy as np
 
 from nltl_viz.palette import Palette
@@ -44,53 +46,23 @@ def cosine_interp_cyclic(values: np.ndarray, t: np.ndarray | float) -> np.ndarra
     return values[i0] * (1.0 - blend) + values[i1] * blend
 
 
-def _face_vertices(size: int, half_fraction: float = _BASE_HALF_FRACTION) -> np.ndarray:
-    """The NLTL face: inscribed in a bounding square, top-left and bottom-left
-    at the box's own corners, bottom-right at 2/3 width along the bottom edge,
-    top-right at 2/3 width x 1/3 height (an interior point of the box, not on
-    any box edge). Clockwise from top-left."""
-    cx = cy = size / 2.0
-    half = half_fraction * size
-    x0, y0 = cx - half, cy - half
-    side = 2.0 * half
-    return np.array(
-        [
-            (x0, y0),
-            (x0 + (2.0 / 3.0) * side, y0 + (1.0 / 3.0) * side),
-            (x0 + (2.0 / 3.0) * side, y0 + side),
-            (x0, y0 + side),
-        ],
-        dtype=np.float64,
-    )
-
-
-def _space_vertices(size: int, half_fraction: float = _BASE_HALF_FRACTION) -> np.ndarray:
-    """NLTL space: the same bounding square minus the NLTL face — the
-    complementary pentagon. Shares the face's short vertical edge and
-    diagonal as its own boundary, traversed in the opposite direction, so
-    the two shapes are exact complements with no gap or overlap. Not convex
-    — there's a reflex vertex where the face's silhouette cuts in. Clockwise
-    from top-left."""
-    cx = cy = size / 2.0
-    half = half_fraction * size
-    x0, y0 = cx - half, cy - half
-    side = 2.0 * half
-    return np.array(
-        [
-            (x0, y0),
-            (x0 + side, y0),
-            (x0 + side, y0 + side),
-            (x0 + (2.0 / 3.0) * side, y0 + side),
-            (x0 + (2.0 / 3.0) * side, y0 + (1.0 / 3.0) * side),
-        ],
-        dtype=np.float64,
-    )
+@cache
+def _unit_points(shape: Shape) -> np.ndarray:
+    """The shape's points from nltl-values, in its unit square (screen
+    orientation: origin top-left, y down — same as Cairo, so no flip)."""
+    points = np.array(nltl_values.shape(shape.value).points, dtype=np.float64)
+    points.flags.writeable = False  # cached and shared — callers must not mutate it
+    return points
 
 
 def _polygon_vertices(size: int, shape: Shape = Shape.face, half_fraction: float = _BASE_HALF_FRACTION) -> np.ndarray:
-    if shape == Shape.space:
-        return _space_vertices(size, half_fraction)
-    return _face_vertices(size, half_fraction)
+    """The shape's nltl-values unit-square points mapped onto a bounding
+    square of side `2 * half_fraction * size`, centered in a `size`-square
+    canvas. The bounding square — not the shape's own extent — is what's
+    centered, so `face` and `space` stay exact complements on screen."""
+    half = half_fraction * size
+    origin = size / 2.0 - half
+    return origin + _unit_points(shape) * (2.0 * half)
 
 
 def _polygon_centroid(vertices: np.ndarray) -> tuple[float, float]:

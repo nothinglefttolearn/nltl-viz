@@ -8,6 +8,7 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "librosa>=0.10.1",
+    "nltl-values @ git+https://github.com/nothinglefttolearn/nltl-values@v0.1.0",
     "numpy>=1.26",
     "pycairo>=1.26",
     "pyyaml>=6.0",
@@ -24,6 +25,9 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

@@ -9,7 +9,7 @@ The motion-tuning axis: a named set of amplitude, timing, onset, and post-fx num
 _Avoid_: style, look (too vague — a Preset is specifically motion tuning, not the whole visual identity)
 
 **Palette**:
-The color axis: a named or custom accent-color scheme (background, outline, and flash colors) chosen via `--palette`, independent of a Preset's motion tuning. The built-in `black` palette keeps a two-color (violet→teal) flash lerp by spectral centroid; other built-in palettes are single-accent — monochrome, no lerp.
+The color axis: a named or custom accent-color scheme (background, outline, and flash colors) chosen via `--palette`, independent of a Preset's motion tuning. The built-in `black` palette keeps a two-color (primary→secondary, from nltl-values) flash lerp by spectral centroid; other built-in palettes are single-accent — monochrome, no lerp.
 _Avoid_: theme, colorway, scheme
 
 **Layout**:
