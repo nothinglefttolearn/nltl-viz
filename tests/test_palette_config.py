@@ -1,3 +1,4 @@
+import nltl_values
 import pytest
 
 from nltl_viz import config
@@ -73,9 +74,15 @@ def test_monochrome_palette_has_no_secondary_color():
     assert BUILTIN["teal"].flash_secondary_color is None
 
 
+def test_violet_and_teal_use_nltl_values_primary_and_secondary():
+    primary, secondary = nltl_values.color("primary"), nltl_values.color("secondary")
+    assert BUILTIN["violet"].outline_color == BUILTIN["violet"].flash_primary_color == primary
+    assert BUILTIN["teal"].outline_color == BUILTIN["teal"].flash_primary_color == secondary
+
+
 def test_black_palette_keeps_duotone_flash():
-    assert BUILTIN["black"].flash_primary_color == "#6E5470"
-    assert BUILTIN["black"].flash_secondary_color == "#2E8C8A"
+    assert BUILTIN["black"].flash_primary_color == nltl_values.color("primary")
+    assert BUILTIN["black"].flash_secondary_color == nltl_values.color("secondary")
 
 
 def test_no_config_path_uses_builtin_directly():

@@ -28,7 +28,7 @@ nltl-viz [audio|video] [flags]
 # Preview 10 seconds before committing to a full render
 nltl-viz --preset industrial --preview demo.wav
 
-# Full render, NLTL violet on a light background
+# Full render, NLTL primary color on a light background
 nltl-viz --preset aggressive --palette violet demo.wav
 
 # 2x2 grid of four identical shape copies
@@ -82,11 +82,13 @@ Run `nltl-viz presets` to list them (with their motion). A preset's own `motion`
 
 | Name | Description |
 |------|--------------|
-| `black` | Dark background, off-white outline, flash lerps NLTL violet to teal by spectral centroid |
-| `violet` | Neutral off-white background, NLTL violet (`#6E5470`) outline and flash |
-| `teal` | Neutral off-white background, NLTL teal (`#2E8C8A`) outline and flash |
+| `black` | Dark background, off-white outline, flash lerps NLTL primary to secondary by spectral centroid |
+| `violet` | Neutral off-white background, NLTL primary color (nltl-values `primary`) outline and flash |
+| `teal` | Neutral off-white background, NLTL secondary color (nltl-values `secondary`) outline and flash |
 
 `black` is the only palette with a two-color (duotone) flash — `violet`/`teal` are monochrome: one accent color throughout, no centroid-driven lerp. Run `nltl-viz palettes` to list them.
+
+The brand colors and the `face`/`space` shape coordinates come from [nltl-values](https://github.com/nothinglefttolearn/nltl-values), pinned to a release tag in `pyproject.toml` — change them there, not here. Background colors are still defined locally in `palette.py`.
 
 ### Layout
 

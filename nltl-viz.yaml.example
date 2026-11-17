@@ -29,5 +29,5 @@ palettes:
     description: Custom color scheme for NLTL releases
     background_color: "#0A0A0C"       # flat background color (non-reactive)
     outline_color: "#D8D8D2"          # shape's color: stroke (deform), solid fill (rigid), or opacity-pulsed solid fill (pulse)
-    flash_primary_color: "#6E5470"    # reactive element's color when spectral centroid is bass-heavy (or the only flash color, if flash_secondary_color is unset)
-    flash_secondary_color: "#2E8C8A"  # optional — reactive element's color when spectral centroid is treble-heavy. Omit for a monochrome flash (flash_primary_color only, no centroid lerp)
+    flash_primary_color: "#DFA4E3"    # reactive element's color when spectral centroid is bass-heavy (or the only flash color, if flash_secondary_color is unset)
+    flash_secondary_color: "#879B87"  # optional — reactive element's color when spectral centroid is treble-heavy. Omit for a monochrome flash (flash_primary_color only, no centroid lerp)
