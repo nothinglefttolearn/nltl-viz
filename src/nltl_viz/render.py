@@ -255,9 +255,12 @@ def draw_inner_shape(
     inner_scale = preset.flash_size * (0.4 + 0.6 * min(brightness, 1.0))
     if inner_scale <= 0:
         return
-    points, _ = scaled_polygon_points(size, shape, inner_scale)
-    # scaled_polygon_points scales from the shape's own centroid, which
-    # already equals `center` here, so points are already correctly placed.
+    # Scale the plain shape about its own centroid, then place that centroid
+    # on `center` — the outer shape's centroid, which already includes the
+    # Layout/overlay offset that `size` alone doesn't carry.
+    vertices = _polygon_vertices(size, shape)
+    own_centroid = np.array(_polygon_centroid(vertices))
+    points = np.array(center) + (vertices - own_centroid) * inner_scale
     rgb01 = tuple(c / 255.0 for c in color)
     _fill_polygon(ctx, points, rgb01)
 
