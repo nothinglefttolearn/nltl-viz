@@ -10,7 +10,9 @@ from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 
 
 def _quality_flags(preview: bool) -> list[str]:
-    return ["-preset", "ultrafast", "-crf", "35"] if preview else ["-preset", "medium", "-crf", "20"]
+    return (
+        ["-preset", "ultrafast", "-crf", "35"] if preview else ["-preset", "medium", "-crf", "20"]
+    )
 
 
 def build_ffmpeg_cmd(
@@ -25,13 +27,33 @@ def build_ffmpeg_cmd(
     return [
         "ffmpeg",
         "-y",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
-        "-i", str(audio_path),
-        "-map", "0:v", "-map", "1:a",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(fps),
+        "-i",
+        "-",
+        "-i",
+        str(audio_path),
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
         *_quality_flags(preview),
-        "-c:a", "aac", "-b:a", "192k",
-        "-t", f"{duration_sec:.3f}",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-t",
+        f"{duration_sec:.3f}",
         "-shortest",
         str(output_path),
     ]
@@ -54,13 +76,31 @@ def build_overlay_ffmpeg_cmd(
     return [
         "ffmpeg",
         "-y",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
-        "-i", str(source_video_path),
-        "-map", "0:v", "-map", "1:a",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(fps),
+        "-i",
+        "-",
+        "-i",
+        str(source_video_path),
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
         *_quality_flags(preview),
-        "-c:a", "copy",
-        "-t", f"{duration_sec:.3f}",
+        "-c:a",
+        "copy",
+        "-t",
+        f"{duration_sec:.3f}",
         "-shortest",
         str(output_path),
     ]
@@ -79,11 +119,15 @@ def render_video(
 
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
 
-    progress_cm = nullcontext() if verbose else Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total} frames"),
-        TimeRemainingColumn(),
+    progress_cm = (
+        nullcontext()
+        if verbose
+        else Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total} frames"),
+            TimeRemainingColumn(),
+        )
     )
 
     with progress_cm as progress:
@@ -106,5 +150,9 @@ def render_video(
 
     _, stderr_output = proc.communicate()
     if proc.returncode != 0:
-        message = stderr_output.decode(errors="replace") if stderr_output else "(no ffmpeg output captured)"
+        message = (
+            stderr_output.decode(errors="replace")
+            if stderr_output
+            else "(no ffmpeg output captured)"
+        )
         raise RuntimeError(f"ffmpeg failed (exit {proc.returncode}):\n{message}")

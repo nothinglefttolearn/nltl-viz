@@ -27,11 +27,17 @@ class VideoProbe:
 
 def probe(video_path: Path) -> VideoProbe:
     cmd = [
-        "ffprobe", "-v", "error",
-        "-select_streams", "v:0",
-        "-show_entries", "stream=width,height,r_frame_rate",
-        "-show_entries", "format=duration",
-        "-of", "json",
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height,r_frame_rate",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -41,7 +47,9 @@ def probe(video_path: Path) -> VideoProbe:
     data = json.loads(result.stdout)
     stream = data["streams"][0]
     frac = Fraction(stream["r_frame_rate"])
-    fps_rational = str(frac.numerator) if frac.denominator == 1 else f"{frac.numerator}/{frac.denominator}"
+    fps_rational = (
+        str(frac.numerator) if frac.denominator == 1 else f"{frac.numerator}/{frac.denominator}"
+    )
 
     return VideoProbe(
         width=int(stream["width"]),
@@ -54,14 +62,20 @@ def probe(video_path: Path) -> VideoProbe:
 
 def extract_audio(video_path: Path, output_wav_path: Path) -> None:
     cmd = [
-        "ffmpeg", "-y",
-        "-i", str(video_path),
-        "-vn", "-acodec", "pcm_s16le",
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
         str(output_wav_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg audio extraction failed (exit {result.returncode}):\n{result.stderr}")
+        raise RuntimeError(
+            f"ffmpeg audio extraction failed (exit {result.returncode}):\n{result.stderr}"
+        )
 
 
 def decode_frames(video_path: Path, width: int, height: int, n_frames: int) -> Iterator[np.ndarray]:
@@ -84,7 +98,7 @@ def decode_frames(video_path: Path, width: int, height: int, n_frames: int) -> I
 
 
 def composite_over(video_frame_rgb: np.ndarray, viz_rgba_premultiplied: np.ndarray) -> np.ndarray:
-    """"Over" compositing with premultiplied source alpha:
+    """ "Over" compositing with premultiplied source alpha:
     out = fg_premultiplied + bg * (1 - alpha)."""
     fg_rgb = viz_rgba_premultiplied[:, :, :3].astype(np.float32)
     alpha = viz_rgba_premultiplied[:, :, 3:4].astype(np.float32) / 255.0

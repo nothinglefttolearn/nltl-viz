@@ -108,7 +108,12 @@ def test_every_art_color_is_used_by_a_builtin_palette():
     used = {
         value
         for p in BUILTIN.values()
-        for value in (p.background_color, p.outline_color, p.flash_primary_color, p.flash_secondary_color)
+        for value in (
+            p.background_color,
+            p.outline_color,
+            p.flash_primary_color,
+            p.flash_secondary_color,
+        )
     }
     art = {v for k, v in nltl_values.colors().items() if k.startswith("art.")}
     assert art <= used

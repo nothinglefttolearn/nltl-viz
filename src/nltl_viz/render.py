@@ -12,7 +12,9 @@ from nltl_viz.palette import Palette
 from nltl_viz.preset import Preset
 
 _BASE_HALF_FRACTION = 0.35
-_PULSE_HALF_FRACTION = 0.5  # edge-to-edge in the frame's shorter dimension — see pulse_polygon_points
+_PULSE_HALF_FRACTION = (
+    0.5  # edge-to-edge in the frame's shorter dimension — see pulse_polygon_points
+)
 _FLASH_VISIBLE_THRESHOLD = 0.02
 
 
@@ -64,7 +66,9 @@ def _unit_points(shape: Shape) -> np.ndarray:
     return points
 
 
-def _polygon_vertices(size: int, shape: Shape = Shape.face, half_fraction: float = _BASE_HALF_FRACTION) -> np.ndarray:
+def _polygon_vertices(
+    size: int, shape: Shape = Shape.face, half_fraction: float = _BASE_HALF_FRACTION
+) -> np.ndarray:
     """The shape's nltl-values unit-square points mapped onto a bounding
     square of side `2 * half_fraction * size`, centered in a `size`-square
     canvas. The bounding square — not the shape's own extent — is what's
@@ -84,9 +88,7 @@ def _polygon_centroid(vertices: np.ndarray) -> tuple[float, float]:
     return float(cx), float(cy)
 
 
-def _polygon_perimeter_points(
-    t: np.ndarray, vertices: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def _polygon_perimeter_points(t: np.ndarray, vertices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Arc-length-proportional position on the polygon boundary at parameter
     t in [0,1) — so a control point index maps to actual distance traveled
     around the perimeter, not an equal share per edge."""
@@ -99,9 +101,7 @@ def _polygon_perimeter_points(
 
     t = np.mod(np.asarray(t, dtype=np.float64), 1.0)
     target = t * total_length
-    seg_idx = np.clip(
-        np.searchsorted(cum_lengths, target, side="right") - 1, 0, len(vertices) - 1
-    )
+    seg_idx = np.clip(np.searchsorted(cum_lengths, target, side="right") - 1, 0, len(vertices) - 1)
     local_frac = (target - cum_lengths[seg_idx]) / edge_lengths[seg_idx]
 
     points = starts[seg_idx] + edge_vectors[seg_idx] * local_frac[:, None]
@@ -342,16 +342,12 @@ def draw_split_instance(
         _stroke_polygon(ctx, points + np.array([shift, 0.0]), outline_rgb, line_width)
 
 
-def surface_to_rgb24(
-    surface: cairo.ImageSurface, width: int, height: int
-) -> np.ndarray:
+def surface_to_rgb24(surface: cairo.ImageSurface, width: int, height: int) -> np.ndarray:
     """cairo.FORMAT_ARGB32 is premultiplied, native-endian — BGRA in memory on
     little-endian — with row stride possibly padded beyond width*4."""
     surface.flush()
     stride = surface.get_stride()
-    buf = np.ndarray(
-        shape=(height, stride // 4, 4), dtype=np.uint8, buffer=surface.get_data()
-    )
+    buf = np.ndarray(shape=(height, stride // 4, 4), dtype=np.uint8, buffer=surface.get_data())
     buf = buf[:, :width, :]
     rgb = buf[:, :, [2, 1, 0]]
     return np.ascontiguousarray(rgb)
@@ -368,9 +364,7 @@ def surface_to_rgba_premultiplied(
     (anti-aliased) edge pixels."""
     surface.flush()
     stride = surface.get_stride()
-    buf = np.ndarray(
-        shape=(height, stride // 4, 4), dtype=np.uint8, buffer=surface.get_data()
-    )
+    buf = np.ndarray(shape=(height, stride // 4, 4), dtype=np.uint8, buffer=surface.get_data())
     buf = buf[:, :width, :]
     rgba = buf[:, :, [2, 1, 0, 3]]
     return np.ascontiguousarray(rgba)
@@ -643,8 +637,17 @@ def render_frame(
     for instance_size, offset in _layout_instances(layout, w, h, size):
         if isinstance(subject, Image):
             draw_image_instance(
-                ctx, subject, band_values, flash_brightness, flash_color, preset, instance_size,
-                motion, scale_value, offset, (w, h),
+                ctx,
+                subject,
+                band_values,
+                flash_brightness,
+                flash_color,
+                preset,
+                instance_size,
+                motion,
+                scale_value,
+                offset,
+                (w, h),
             )
             continue
 
@@ -668,8 +671,17 @@ def render_frame(
             )
 
         draw_shape_instance(
-            ctx, points, flash_brightness, flash_color, preset, palette, instance_size, centroid,
-            shape, motion, opacity=opacity,
+            ctx,
+            points,
+            flash_brightness,
+            flash_color,
+            preset,
+            palette,
+            instance_size,
+            centroid,
+            shape,
+            motion,
+            opacity=opacity,
         )
 
     if transparent_background:

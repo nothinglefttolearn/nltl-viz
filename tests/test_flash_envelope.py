@@ -51,7 +51,11 @@ def test_monochrome_palette_color_is_constant_regardless_of_centroid():
     onsets = [OnsetEvent(frame_index=0, strength=1.0)]
     centroid = np.array([0.0, 0.5, 1.0])
     _, color = precompute_flash_signal(
-        onsets, centroid, n_frames=3, fps=30, preset=_preset(),
+        onsets,
+        centroid,
+        n_frames=3,
+        fps=30,
+        preset=_preset(),
         palette=_palette(flash_primary_color="#112233"),
     )
     assert np.allclose(color, [0x11, 0x22, 0x33])
@@ -61,7 +65,11 @@ def test_duotone_palette_lerps_by_centroid():
     onsets = [OnsetEvent(frame_index=0, strength=1.0)]
     centroid = np.array([0.0, 1.0])
     _, color = precompute_flash_signal(
-        onsets, centroid, n_frames=2, fps=30, preset=_preset(),
+        onsets,
+        centroid,
+        n_frames=2,
+        fps=30,
+        preset=_preset(),
         palette=_palette(flash_primary_color="#6E5470", flash_secondary_color="#2E8C8A"),
     )
     assert np.allclose(color[0], [0x6E, 0x54, 0x70])

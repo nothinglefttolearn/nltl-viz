@@ -32,7 +32,9 @@ def test_offset_translates_deformed_points_and_centroid():
 
 def test_offset_translates_scaled_points_and_centroid():
     points, centroid = scaled_polygon_points(300, Shape.face, scale=1.2)
-    offset_points, offset_centroid = scaled_polygon_points(300, Shape.face, scale=1.2, offset=(420.0, 10.0))
+    offset_points, offset_centroid = scaled_polygon_points(
+        300, Shape.face, scale=1.2, offset=(420.0, 10.0)
+    )
     assert np.allclose(offset_points, points + np.array([420.0, 10.0]))
     assert offset_centroid == (centroid[0] + 420.0, centroid[1] + 10.0)
 
@@ -40,7 +42,14 @@ def test_offset_translates_scaled_points_and_centroid():
 def test_render_frame_default_matches_prior_opaque_behavior():
     preset = BUILTIN["industrial"]
     frame = render_frame(
-        np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE, size=100, subject=Shape.face, motion=Motion.rigid
+        np.zeros(preset.band_count),
+        0.0,
+        (0, 0, 0),
+        preset,
+        PALETTE,
+        size=100,
+        subject=Shape.face,
+        motion=Motion.rigid,
     )
     assert frame.shape == (100, 100, 3)
 
@@ -124,27 +133,47 @@ def test_grid_layout_draws_four_opaque_quadrant_centers():
 def test_single_layout_ignores_grid_and_draws_once():
     preset = BUILTIN["industrial"]
     frame_single = render_frame(
-        np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE,
-        size=100, subject=Shape.face, motion=Motion.rigid, layout=Layout.single,
+        np.zeros(preset.band_count),
+        0.0,
+        (0, 0, 0),
+        preset,
+        PALETTE,
+        size=100,
+        subject=Shape.face,
+        motion=Motion.rigid,
+        layout=Layout.single,
     )
     frame_default = render_frame(
-        np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE,
-        size=100, subject=Shape.face, motion=Motion.rigid,
+        np.zeros(preset.band_count),
+        0.0,
+        (0, 0, 0),
+        preset,
+        PALETTE,
+        size=100,
+        subject=Shape.face,
+        motion=Motion.rigid,
     )
     assert np.array_equal(frame_single, frame_default)
 
 
-@pytest.mark.parametrize(
-    "layout, canvas", [(Layout.single, (400, 100)), (Layout.grid, (200, 200))]
-)
+@pytest.mark.parametrize("layout, canvas", [(Layout.single, (400, 100)), (Layout.grid, (200, 200))])
 def test_rigid_inner_flash_is_concentric_with_offset_shape(layout, canvas):
     """The inner flash copy must sit on its own (offset) shape's centroid, not
     on where the shape would be at the canvas origin."""
     preset = replace(BUILTIN["industrial"], motion="rigid", flash_size=0.5)
     w, h = canvas
     frame = render_frame(
-        np.zeros(preset.band_count), 1.0, (0, 0, 255), preset, PALETTE, size=100,
-        subject=Shape.face, motion=Motion.rigid, layout=layout, width=w, height=h,
+        np.zeros(preset.band_count),
+        1.0,
+        (0, 0, 255),
+        preset,
+        PALETTE,
+        size=100,
+        subject=Shape.face,
+        motion=Motion.rigid,
+        layout=layout,
+        width=w,
+        height=h,
     )
     for instance_size, offset in _layout_instances(layout, w, h, 100):
         vertices = _polygon_vertices(instance_size, Shape.face) + np.array(offset)
@@ -152,8 +181,17 @@ def test_rigid_inner_flash_is_concentric_with_offset_shape(layout, canvas):
         assert tuple(frame[cy, cx]) == (0, 0, 255)
     blue = (frame[:, :, 2] == 255) & (frame[:, :, 0] == 0)
     outer = render_frame(
-        np.zeros(preset.band_count), 0.0, (0, 0, 255), preset, PALETTE, size=100,
-        subject=Shape.face, motion=Motion.rigid, layout=layout, width=w, height=h,
+        np.zeros(preset.band_count),
+        0.0,
+        (0, 0, 255),
+        preset,
+        PALETTE,
+        size=100,
+        subject=Shape.face,
+        motion=Motion.rigid,
+        layout=layout,
+        width=w,
+        height=h,
     )
     background = np.all(outer == outer[0, 0], axis=-1)
     assert not (blue & background).any()  # no flash pixels outside the outer shapes

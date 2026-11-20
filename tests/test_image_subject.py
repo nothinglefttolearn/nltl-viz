@@ -109,7 +109,9 @@ def test_rect_perimeter_starts_top_left_and_runs_clockwise():
     }
     for name, (dx, dy, expected) in dirs.items():
         t = float(_rect_perimeter_t(np.array(dx), np.array(dy), hw, hh))
-        assert t == pytest.approx(expected, abs=1e-9) or (expected == 0 and t == pytest.approx(1.0)), name
+        assert t == pytest.approx(expected, abs=1e-9) or (
+            expected == 0 and t == pytest.approx(1.0)
+        ), name
 
 
 def test_deform_with_silent_bands_leaves_image_unwarped():
@@ -191,7 +193,9 @@ def test_grid_draws_four_image_copies():
 
 
 def test_overlay_canvas_keeps_transparent_corners_around_image():
-    frame = _render(_solid(50, 50), Motion.deform, width=320, height=180, transparent_background=True)
+    frame = _render(
+        _solid(50, 50), Motion.deform, width=320, height=180, transparent_background=True
+    )
     assert frame.shape == (180, 320, 4)
     assert frame[0, 0, 3] == 0
     assert frame[90, 160, 3] == 255

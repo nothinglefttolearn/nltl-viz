@@ -59,7 +59,9 @@ def analyze(audio_path: Path, preset: Preset, palette: Palette, fps: int = 30) -
     rms_norm = _resize_to_frames(rms_norm, n_frames)
     scale_envelope = _ema_smooth(rms_norm, preset.smoothing_attack, preset.smoothing_release, fps)
 
-    flash_brightness, flash_color = precompute_flash_signal(onsets, centroid, n_frames, fps, preset, palette)
+    flash_brightness, flash_color = precompute_flash_signal(
+        onsets, centroid, n_frames, fps, preset, palette
+    )
 
     return AudioAnalysis(
         sample_rate=sr,

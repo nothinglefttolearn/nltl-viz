@@ -7,7 +7,9 @@ from dataclasses import dataclass, fields
 class Preset:
     name: str
     description: str = ""
-    motion: str = "deform"  # one of Motion's values ("deform", "rigid", "pulse", "split") — see render.Motion
+    motion: str = (
+        "deform"  # one of Motion's values ("deform", "rigid", "pulse", "split") — see render.Motion
+    )
     band_count: int = 32
     deform_amplitude: float = 0.0
     scale_amplitude: float = 0.0

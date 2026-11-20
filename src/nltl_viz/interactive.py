@@ -45,7 +45,8 @@ def run() -> Choices:
 
     preset_choices = [
         questionary.Choice(
-            title=f"{name} — {preset_mod.get(name).description} [{preset_mod.get(name).motion}]", value=name
+            title=f"{name} — {preset_mod.get(name).description} [{preset_mod.get(name).motion}]",
+            value=name,
         )
         for name in preset_mod.names()
     ]
@@ -70,7 +71,9 @@ def run() -> Choices:
         raise RuntimeError("cancelled")
 
     shape_choices = [
-        questionary.Choice(title=f"{s.value} — {nltl_values.shape(s.value).description}", value=s.value)
+        questionary.Choice(
+            title=f"{s.value} — {nltl_values.shape(s.value).description}", value=s.value
+        )
         for s in Shape
     ]
     shape_answer = questionary.select("Shape", choices=shape_choices).ask()
