@@ -7,6 +7,7 @@ import cairo
 import nltl_values
 import numpy as np
 
+from nltl_viz.image import Image, premultiplied_rgba_to_surface
 from nltl_viz.palette import Palette
 from nltl_viz.preset import Preset
 
@@ -16,8 +17,16 @@ _FLASH_VISIBLE_THRESHOLD = 0.02
 
 
 class Shape(str, Enum):
+    """Shapes deliberately exposed as `--shape` choices. Each value must name
+    a shape in nltl-values; a shape that is new in nltl-values is only added
+    here after it has been checked rendered under every Motion."""
+
     face = "face"
     space = "space"
+    face2 = "face2"
+    space2 = "space2"
+    face3 = "face3"
+    space3 = "space3"
 
 
 class Motion(str, Enum):
@@ -391,6 +400,213 @@ def _layout_instances(
     ]
 
 
+def image_box(
+    image: Image, size: int, half_fraction: float, offset: tuple[float, float] = (0.0, 0.0)
+) -> tuple[float, float, int, int]:
+    """The Image's contain box: `(x0, y0, box_w, box_h)` — the Image scaled
+    to fit, aspect preserved, inside the same bounding square a Shape would
+    occupy at `half_fraction` (see `_polygon_vertices`), centered in it. So
+    every Preset amplitude means the same for either Subject (ADR 0004)."""
+    side = 2.0 * half_fraction * size
+    box_w, box_h = image.contain_box(side)
+    x0 = offset[0] + (size - box_w) / 2.0
+    y0 = offset[1] + (size - box_h) / 2.0
+    return x0, y0, box_w, box_h
+
+
+def _rect_perimeter_t(dx: np.ndarray, dy: np.ndarray, half_w: float, half_h: float) -> np.ndarray:
+    """For directions `(dx, dy)` from a rectangle's center, the arc-length
+    parameter t in [0, 1) of where each ray meets the rectangle's edge —
+    starting at the top-left corner and running clockwise on screen (y down),
+    the same convention `_polygon_perimeter_points` gives a Shape whose first
+    vertex is top-left."""
+    w, h = 2.0 * half_w, 2.0 * half_h
+    perimeter = 2.0 * (w + h)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        kx = np.where(dx != 0, half_w / np.abs(dx), np.inf)
+        ky = np.where(dy != 0, half_h / np.abs(dy), np.inf)
+    k = np.minimum(kx, ky)
+    k = np.where(np.isfinite(k), k, 0.0)
+    # Hit point relative to the top-left corner.
+    bx = np.clip(half_w + dx * k, 0.0, w)
+    by = np.clip(half_h + dy * k, 0.0, h)
+    hits_side = kx < ky
+    s = np.where(
+        hits_side,
+        np.where(dx > 0, w + by, 2.0 * w + h + (h - by)),  # right edge / left edge
+        np.where(dy < 0, bx, w + h + (w - bx)),  # top edge / bottom edge
+    )
+    return np.mod(s / perimeter, 1.0)
+
+
+def _sample_bilinear(src: np.ndarray, sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
+    """Bilinear lookup of premultiplied RGBA `src` (h, w, 4) at pixel-center
+    coordinates `(sx, sy)`; anything outside `src` reads as transparent. Done
+    on premultiplied values so anti-aliased edges don't fringe."""
+    h, w = src.shape[:2]
+    padded = np.zeros((h + 2, w + 2, 4), dtype=np.float32)
+    padded[1:-1, 1:-1] = src
+    # +1 for the padding border, -0.5 to go from pixel-center to index space.
+    fx = np.clip(sx + 0.5, 0.0, w + 1.0)
+    fy = np.clip(sy + 0.5, 0.0, h + 1.0)
+    x0 = np.clip(np.floor(fx).astype(np.intp), 0, w)
+    y0 = np.clip(np.floor(fy).astype(np.intp), 0, h)
+    ux = (fx - x0)[..., None]
+    uy = (fy - y0)[..., None]
+    top = padded[y0, x0] * (1.0 - ux) + padded[y0, x0 + 1] * ux
+    bottom = padded[y0 + 1, x0] * (1.0 - ux) + padded[y0 + 1, x0 + 1] * ux
+    return top * (1.0 - uy) + bottom * uy
+
+
+def deformed_image(
+    image: Image,
+    band_values: np.ndarray,
+    size: int,
+    amplitude: float,
+    *,
+    offset: tuple[float, float] = (0.0, 0.0),
+    canvas: tuple[int, int] | None = None,
+) -> tuple[np.ndarray, tuple[int, int], tuple[float, float]]:
+    """`Motion.deform` for an Image: the contain-box rectangle stands in for
+    the polygon perimeter (ADR 0004). Bands are spread around it by arc
+    length, and every pixel is pushed radially from the box's center by
+    `1 + amplitude * band(t)`, t being where its ray meets the edge.
+
+    Because that warp is purely radial — a pixel's scale depends only on its
+    angle — it inverts exactly: each output pixel `q` reads the source at
+    `c + (q - c) / scale(t(q))`. Returns the warped premultiplied RGBA
+    region, its integer top-left position on the canvas, and the center."""
+    x0, y0, box_w, box_h = image_box(image, size, _BASE_HALF_FRACTION, offset)
+    cx, cy = x0 + box_w / 2.0, y0 + box_h / 2.0
+    half_w, half_h = box_w / 2.0, box_h / 2.0
+    reach = 1.0 + max(amplitude, 0.0) * max(float(np.max(band_values, initial=0.0)), 0.0)
+
+    left, top = int(np.floor(cx - half_w * reach)), int(np.floor(cy - half_h * reach))
+    right, bottom = int(np.ceil(cx + half_w * reach)), int(np.ceil(cy + half_h * reach))
+    if canvas is not None:
+        left, top = max(left, 0), max(top, 0)
+        right, bottom = min(right, canvas[0]), min(bottom, canvas[1])
+    if right <= left or bottom <= top:
+        return np.zeros((0, 0, 4), dtype=np.uint8), (left, top), (cx, cy)
+
+    qx, qy = np.meshgrid(
+        np.arange(left, right, dtype=np.float64) + 0.5,
+        np.arange(top, bottom, dtype=np.float64) + 0.5,
+    )
+    dx, dy = qx - cx, qy - cy
+    t = _rect_perimeter_t(dx, dy, half_w, half_h)
+    scale = 1.0 + amplitude * cosine_interp_cyclic(band_values, t)
+    sx = dx / scale + half_w - 0.5
+    sy = dy / scale + half_h - 0.5
+    warped = _sample_bilinear(image.premultiplied(box_w, box_h), sx, sy)
+    region = np.clip(np.rint(warped), 0, 255).astype(np.uint8)
+    return region, (left, top), (cx, cy)
+
+
+def _paint_image(
+    ctx: cairo.Context,
+    image: Image,
+    box: tuple[float, float, int, int],
+    scale: float = 1.0,
+    *,
+    alpha: float = 1.0,
+    silhouette_rgb: tuple[float, float, float] | None = None,
+) -> None:
+    """Paints the Image's contain box scaled by `scale` about its own center.
+    With `silhouette_rgb`, paints that flat color through the Image's alpha
+    instead of its pixels (`Motion.rigid`'s inner flash copy)."""
+    x0, y0, box_w, box_h = box
+    if scale <= 0:
+        return
+    cx, cy = x0 + box_w / 2.0, y0 + box_h / 2.0
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(scale, scale)
+    ctx.translate(-box_w / 2.0, -box_h / 2.0)
+    surface = image.surface(box_w, box_h)
+    if silhouette_rgb is None:
+        ctx.set_source_surface(surface, 0.0, 0.0)
+        ctx.paint_with_alpha(alpha)
+    else:
+        ctx.set_source_rgba(*silhouette_rgb, alpha)
+        ctx.mask_surface(surface, 0.0, 0.0)
+    ctx.restore()
+
+
+def draw_image_instance(
+    ctx: cairo.Context,
+    image: Image,
+    band_values: np.ndarray,
+    flash_brightness: float,
+    flash_color: tuple[float, float, float],
+    preset: Preset,
+    size: int,
+    motion: Motion,
+    scale_value: float,
+    offset: tuple[float, float],
+    canvas: tuple[int, int],
+) -> None:
+    """One Image Subject copy — the Image counterpart of
+    `draw_shape_instance`/`draw_split_instance`. Each Motion keeps its Shape
+    meaning; the Image's own pixels take the place of `outline_color`, and
+    the flash (deform/rigid only) is drawn on top, confined to the Image's
+    alpha, since an opaque Image would hide a flash drawn behind it."""
+    if motion == Motion.pulse:
+        box = image_box(image, size, _PULSE_HALF_FRACTION, offset)
+        _paint_image(ctx, image, box, alpha=preset.pulse_max_opacity * scale_value)
+        return
+
+    box = image_box(image, size, _BASE_HALF_FRACTION, offset)
+    x0, y0, box_w, box_h = box
+
+    if motion == Motion.split:
+        dx = preset.split_amplitude * size * scale_value
+        y_mid = offset[1] + size / 2.0
+        for clip_top, clip_bottom, shift in ((y0, y_mid, -dx), (y_mid, y0 + box_h, dx)):
+            if clip_bottom <= clip_top:
+                continue
+            ctx.save()
+            ctx.translate(shift, 0.0)
+            ctx.rectangle(x0, clip_top, box_w, clip_bottom - clip_top)
+            ctx.clip()
+            _paint_image(ctx, image, box)
+            ctx.restore()
+        return
+
+    if motion == Motion.rigid:
+        scale = 1.0 + preset.scale_amplitude * (scale_value - 0.5) * 2.0
+        _paint_image(ctx, image, box, scale)
+        if flash_brightness > _FLASH_VISIBLE_THRESHOLD:
+            inner_scale = preset.flash_size * (0.4 + 0.6 * min(flash_brightness, 1.0))
+            rgb01 = tuple(c / 255.0 for c in flash_color)
+            _paint_image(ctx, image, box, inner_scale, silhouette_rgb=rgb01)
+        return
+
+    region, (left, top), center = deformed_image(
+        image, band_values, size, preset.deform_amplitude, offset=offset, canvas=canvas
+    )
+    if region.size == 0:
+        return
+    warped = premultiplied_rgba_to_surface(region)
+    ctx.set_source_surface(warped, left, top)
+    ctx.paint()
+
+    if flash_brightness <= _FLASH_VISIBLE_THRESHOLD:
+        return
+    radius = preset.flash_size * 0.5 * size * (0.4 + 0.6 * min(flash_brightness, 1.0))
+    if radius <= 0:
+        return
+    r, g, b = (c / 255.0 for c in flash_color)
+    gradient = cairo.RadialGradient(*center, 0.0, *center, radius)
+    gradient.add_color_stop_rgba(0.0, r, g, b, min(flash_brightness, 1.0))
+    gradient.add_color_stop_rgba(1.0, r, g, b, 0.0)
+    ctx.save()
+    ctx.set_operator(cairo.OPERATOR_ADD)
+    ctx.set_source(gradient)
+    ctx.mask_surface(warped, left, top)
+    ctx.restore()
+
+
 def render_frame(
     band_values: np.ndarray,
     flash_brightness: float,
@@ -398,7 +614,7 @@ def render_frame(
     preset: Preset,
     palette: Palette,
     size: int,
-    shape: Shape = Shape.face,
+    subject: Shape | Image = Shape.face,
     motion: Motion = Motion.deform,
     scale_value: float = 0.5,
     layout: Layout = Layout.single,
@@ -408,10 +624,10 @@ def render_frame(
     transparent_background: bool = False,
 ) -> np.ndarray:
     """Renders one frame onto a `width`x`height` canvas (defaulting to a
-    `size`x`size` square when unset). Under `Layout.single` the shape is
+    `size`x`size` square when unset). Under `Layout.single` the Subject is
     sized and proportioned off `size` and centered in the canvas — so a
     wider canvas just extends the (transparent, in overlay mode) area around
-    the shape rather than stretching it. Under `Layout.grid`, 4 identical
+    the Subject rather than stretching it. Under `Layout.grid`, 4 identical
     copies are drawn, one per quadrant, all driven by the same
     `band_values`/`flash_brightness`/`flash_color`/`scale_value`."""
     w = width if width is not None else size
@@ -422,6 +638,14 @@ def render_frame(
     _paint_background(ctx, palette, transparent_background)
 
     for instance_size, offset in _layout_instances(layout, w, h, size):
+        if isinstance(subject, Image):
+            draw_image_instance(
+                ctx, subject, band_values, flash_brightness, flash_color, preset, instance_size,
+                motion, scale_value, offset, (w, h),
+            )
+            continue
+
+        shape = subject
         if motion == Motion.split:
             top_points, bottom_points = split_polygon_points(instance_size, shape, offset=offset)
             dx = preset.split_amplitude * instance_size * scale_value

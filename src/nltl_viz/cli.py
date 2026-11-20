@@ -18,6 +18,7 @@ from nltl_viz import palette as palette_mod
 from nltl_viz import preset as preset_mod
 from nltl_viz import video as video_mod
 from nltl_viz.audio import AudioAnalysis
+from nltl_viz.image import Image
 from nltl_viz.palette import Palette
 from nltl_viz.preset import Preset
 from nltl_viz.render import Layout, Motion, Shape
@@ -48,11 +49,11 @@ app = typer.Typer(
         "or — given a video file — overlay it with transparency onto that video, "
         "using the video's own audio track for analysis.\n\n"
         "Usage: nltl-viz [AUDIO|VIDEO] [--preset NAME] [--palette NAME] [--layout single|grid] "
-        "[--shape face|space] [--preview] [--output-dir DIR] [--config FILE] [--verbose]\n\n"
+        "[--shape SHAPE | --image FILE] [--preview] [--output-dir DIR] [--config FILE] [--verbose]\n\n"
         "Preset (motion tuning), palette (color), and layout (canvas arrangement) are "
         "independent settings that combine freely — see `nltl-viz presets` and "
-        "`nltl-viz palettes`. Motion (deform/rigid/pulse) comes from the chosen preset, "
-        "not a separate flag.\n\n"
+        "`nltl-viz palettes`. Motion (deform/rigid/pulse/split) comes from the chosen preset, "
+        "not a separate flag. --image animates a picture in place of the NLTL shape.\n\n"
         "Run with no arguments for interactive mode (audio files only)."
     ),
 )
@@ -60,7 +61,7 @@ console = Console()
 
 
 def _frame_generator(
-    analysis: AudioAnalysis, preset_obj: Preset, palette_obj: Palette, size: int, shape: Shape, layout: Layout
+    analysis: AudioAnalysis, preset_obj: Preset, palette_obj: Palette, size: int, subject: Shape | Image, layout: Layout
 ) -> Iterable[np.ndarray]:
     motion = Motion(preset_obj.motion)
     vignette_mask = postprocess.build_vignette_mask(size, size, preset_obj.vignette_fraction)
@@ -71,7 +72,7 @@ def _frame_generator(
         color = tuple(analysis.flash_color[i])
         scale_value = float(analysis.scale_envelope[i])
         frame = render.render_frame(
-            band_values, brightness, color, preset_obj, palette_obj, size, shape, motion, scale_value, layout
+            band_values, brightness, color, preset_obj, palette_obj, size, subject, motion, scale_value, layout
         )
         frame = postprocess.apply_vignette(frame, vignette_mask)
         frame = postprocess.apply_grain(frame, preset_obj.grain_strength, rng)
@@ -84,7 +85,7 @@ def _overlay_frame_generator(
     palette_obj: Palette,
     width: int,
     height: int,
-    shape: Shape,
+    subject: Shape | Image,
     layout: Layout,
 ) -> Iterable[np.ndarray]:
     """Same per-frame render as `_frame_generator`, but on a transparent
@@ -106,7 +107,7 @@ def _overlay_frame_generator(
         color = tuple(analysis.flash_color[i])
         scale_value = float(analysis.scale_envelope[i])
         frame = render.render_frame(
-            band_values, brightness, color, preset_obj, palette_obj, size, shape, motion, scale_value, layout,
+            band_values, brightness, color, preset_obj, palette_obj, size, subject, motion, scale_value, layout,
             width=width, height=height, transparent_background=True,
         )
         rgb, alpha = frame[:, :, :3], frame[:, :, 3:4]
@@ -120,7 +121,7 @@ def run_render(
     preset_name: str,
     palette_name: str,
     layout: Layout,
-    shape: Shape,
+    subject: Shape | Image,
     output_dir: Path | None,
     config_path: Path | None,
     preview: bool,
@@ -133,7 +134,7 @@ def run_render(
     console.print(f"[bold]Preset[/bold]    {resolved_preset.name} — {resolved_preset.description}")
     console.print(f"[bold]Palette[/bold]   {resolved_palette.name} — {resolved_palette.description}")
     console.print(f"[bold]Layout[/bold]    {layout.value}")
-    console.print(f"[bold]Shape[/bold]     {shape.value}")
+    console.print(_subject_line(subject))
     console.print(f"[bold]Motion[/bold]    {resolved_preset.motion}")
     if preview:
         console.print("[bold]Preview[/bold]   10s low-quality render")
@@ -152,7 +153,7 @@ def run_render(
     console.print(f"[bold]Output[/bold]    {output_path}")
     console.print()
 
-    frames = _frame_generator(analysis, resolved_preset, resolved_palette, SIZE, shape, layout)
+    frames = _frame_generator(analysis, resolved_preset, resolved_palette, SIZE, subject, layout)
     cmd = encode.build_ffmpeg_cmd(audio_path, output_path, SIZE, SIZE, FPS, duration_sec, preview)
     encode.render_video(frames, cmd=cmd, total_frames=total_frames, preview=preview, verbose=verbose)
     console.print(f"[green]Done[/green] → {output_path}")
@@ -163,7 +164,7 @@ def run_overlay(
     preset_name: str,
     palette_name: str,
     layout: Layout,
-    shape: Shape,
+    subject: Shape | Image,
     output_dir: Path | None,
     config_path: Path | None,
     preview: bool,
@@ -177,7 +178,7 @@ def run_overlay(
     console.print(f"[bold]Preset[/bold]    {resolved_preset.name} — {resolved_preset.description}")
     console.print(f"[bold]Palette[/bold]   {resolved_palette.name} — {resolved_palette.description}")
     console.print(f"[bold]Layout[/bold]    {layout.value}")
-    console.print(f"[bold]Shape[/bold]     {shape.value}")
+    console.print(_subject_line(subject))
     console.print(f"[bold]Motion[/bold]    {resolved_preset.motion}")
     console.print(f"[bold]Overlay[/bold]   {probe.width}x{probe.height} @ {probe.fps_rational}fps")
     if preview:
@@ -202,7 +203,7 @@ def run_overlay(
     console.print()
 
     viz_frames = _overlay_frame_generator(
-        analysis, resolved_preset, resolved_palette, probe.width, probe.height, shape, layout
+        analysis, resolved_preset, resolved_palette, probe.width, probe.height, subject, layout
     )
     video_frames = video_mod.decode_frames(video_path, probe.width, probe.height, total_frames)
     composited = (
@@ -215,6 +216,23 @@ def run_overlay(
     )
     encode.render_video(composited, cmd=cmd, total_frames=total_frames, preview=preview, verbose=verbose)
     console.print(f"[green]Done[/green] → {output_path}")
+
+
+def _subject_line(subject: Shape | Image) -> str:
+    if isinstance(subject, Image):
+        return f"[bold]Image[/bold]     {subject.path} ({subject.width}x{subject.height})"
+    return f"[bold]Shape[/bold]     {subject.value}"
+
+
+def resolve_subject(shape: Shape | None, image_path: Path | None) -> Shape | Image:
+    """The render's one Subject: the Image when `--image` is given, else the
+    Shape (default `face`). Passing both is an error rather than one
+    silently winning."""
+    if image_path is not None and shape is not None:
+        raise ValueError("--image and --shape are mutually exclusive: an Image replaces the Shape")
+    if image_path is not None:
+        return Image.load(image_path)
+    return shape if shape is not None else Shape.face
 
 
 def _run_interactive() -> None:
@@ -258,7 +276,12 @@ def render_cmd(
     preset: str = typer.Option("industrial", "--preset", "-p", help="Motion-tuning preset"),
     palette: str = typer.Option("black", "--palette", help="Color palette"),
     layout: Layout = typer.Option(Layout.single, "--layout", help="Canvas arrangement: single or grid"),
-    shape: Shape = typer.Option(Shape.face, "--shape", help="Shape to visualize: face or space"),
+    shape: Shape | None = typer.Option(
+        None, "--shape", help="NLTL shape to animate (default: face)", show_default=False
+    ),
+    image: Path | None = typer.Option(
+        None, "--image", "-i", help="Picture file to animate instead of a shape (not with --shape)"
+    ),
     preview: bool = typer.Option(False, "--preview", help="Render a 10s low-quality preview"),
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o", help="Output directory"),
     config_path: Path | None = typer.Option(
@@ -273,10 +296,11 @@ def render_cmd(
         return
 
     try:
+        subject = resolve_subject(shape, image)
         if video_mod.is_video_file(input_path):
-            run_overlay(input_path, preset, palette, layout, shape, output_dir, config_path, preview, verbose)
+            run_overlay(input_path, preset, palette, layout, subject, output_dir, config_path, preview, verbose)
         else:
-            run_render(input_path, preset, palette, layout, shape, output_dir, config_path, preview, verbose)
+            run_render(input_path, preset, palette, layout, subject, output_dir, config_path, preview, verbose)
     except Exception as exc:  # surface any failure as a clean CLI error, not a traceback
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1) from exc

@@ -37,7 +37,7 @@ def test_offset_translates_scaled_points_and_centroid():
 def test_render_frame_default_matches_prior_opaque_behavior():
     preset = BUILTIN["industrial"]
     frame = render_frame(
-        np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE, size=100, shape=Shape.face, motion=Motion.rigid
+        np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE, size=100, subject=Shape.face, motion=Motion.rigid
     )
     assert frame.shape == (100, 100, 3)
 
@@ -52,7 +52,7 @@ def test_render_frame_transparent_background_is_rgba_with_transparent_corners():
         preset,
         PALETTE,
         size=size,
-        shape=Shape.face,
+        subject=Shape.face,
         motion=Motion.rigid,
         scale_value=0.5,
         width=width,
@@ -79,7 +79,7 @@ def test_render_frame_centers_shape_within_wider_canvas():
         preset,
         PALETTE,
         size=size,
-        shape=Shape.face,
+        subject=Shape.face,
         motion=Motion.rigid,
         scale_value=0.5,  # scale == 1.0 for the "industrial" preset's scale_amplitude
         width=width,
@@ -100,7 +100,7 @@ def test_grid_layout_draws_four_opaque_quadrant_centers():
         preset,
         PALETTE,
         size=width,  # ignored for grid — see _layout_instances
-        shape=Shape.face,
+        subject=Shape.face,
         motion=Motion.rigid,
         scale_value=0.5,
         layout=Layout.grid,
@@ -122,10 +122,10 @@ def test_single_layout_ignores_grid_and_draws_once():
     preset = BUILTIN["industrial"]
     frame_single = render_frame(
         np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE,
-        size=100, shape=Shape.face, motion=Motion.rigid, layout=Layout.single,
+        size=100, subject=Shape.face, motion=Motion.rigid, layout=Layout.single,
     )
     frame_default = render_frame(
         np.zeros(preset.band_count), 0.0, (0, 0, 0), preset, PALETTE,
-        size=100, shape=Shape.face, motion=Motion.rigid,
+        size=100, subject=Shape.face, motion=Motion.rigid,
     )
     assert np.array_equal(frame_single, frame_default)
