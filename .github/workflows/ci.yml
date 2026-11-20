@@ -4,14 +4,64 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Each mise task runs as its own step (with --skip-deps, so nothing reruns
+    # behind the scenes) and gets its own log section and pass/fail status.
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Cairo build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config
-      - uses: jdx/mise-action@v2
-      - run: mise run lint
-      - run: mise run test
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install mise tools (python, uv, ffmpeg)
+        uses: jdx/mise-action@v5
+
+      - name: Install system libraries
+        run: mise run --skip-deps setup
+
+      - name: Check lockfile
+        run: mise run --skip-deps lock:check
+
+      # uv.lock must be checked before `uv sync`, which would silently relock
+      # it. A stale lockfile fails the job but still lets the checks run.
+      - name: Restore uv cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock', 'mise.toml') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      - name: Install dependencies
+        id: sync
+        if: ${{ !cancelled() }}
+        run: mise run --skip-deps sync
+
+      # The checks below run even if an earlier check failed, so one run
+      # reports every problem; they only need dependencies to be installed.
+      - name: Lint
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        run: mise run --skip-deps lint
+
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        run: mise run --skip-deps fmt:check
+
+      - name: Test
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        run: mise run --skip-deps test
+
+      - name: Prune uv cache
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        run: uv cache prune --ci

@@ -7,12 +7,17 @@ This file provides guidance to coding agents working with code in this repositor
 mise-managed (mise pins Python/uv/ffmpeg and defines tasks; uv resolves deps underneath). Run from this directory:
 
 ```bash
-mise run sync                    # install deps (needs: mise run setup, once, for Cairo)
+mise run setup                   # once: system Cairo + pkg-config (brew on macOS, apt on Linux)
+mise run sync                    # install deps
 mise run test                    # run all tests
 mise run test -- tests/test_ema.py::test_constant_input_is_steady_state   # single test
 mise run lint                    # lint
+mise run fmt                     # format (CI fails on unformatted files: fmt:check)
+mise run ci                      # every CI check locally: lock:check, lint, fmt:check, test
 mise run viz -- --preview demo.wav
 ```
+
+Each mise task does one thing. CI (`.github/workflows/ci.yml`) runs them as separate steps with `mise run --skip-deps <task>` so each gets its own log and status; `depends` exists only for local convenience. Keep it that way when adding a check: add a task, add it to `ci`'s `depends`, and add a matching workflow step. `lock:check` must stay before `sync` in CI, because `uv sync` silently relocks.
 
 ## Architecture
 
