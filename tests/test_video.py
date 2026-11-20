@@ -47,7 +47,11 @@ def test_probe_reduces_integer_frame_rate_to_bare_number(monkeypatch):
 
 def test_probe_raises_on_ffprobe_failure(monkeypatch):
     monkeypatch.setattr(
-        subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="boom")
+        subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="", stderr="boom"
+        ),
     )
     with pytest.raises(RuntimeError, match="boom"):
         video.probe(Path("missing.mp4"))

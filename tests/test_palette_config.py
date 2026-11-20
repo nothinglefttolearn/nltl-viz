@@ -75,16 +75,45 @@ def test_monochrome_palette_has_no_secondary_color():
 
 
 def test_violet_and_teal_use_nltl_values_primary_and_secondary():
-    primary, secondary = nltl_values.color("primary"), nltl_values.color("secondary")
+    primary, secondary = nltl_values.color("art.primary"), nltl_values.color("art.secondary")
     assert BUILTIN["violet"].outline_color == BUILTIN["violet"].flash_primary_color == primary
     assert BUILTIN["teal"].outline_color == BUILTIN["teal"].flash_primary_color == secondary
 
 
 def test_black_palette_keeps_duotone_flash():
-    assert BUILTIN["black"].flash_primary_color == nltl_values.color("primary")
-    assert BUILTIN["black"].flash_secondary_color == nltl_values.color("secondary")
+    assert BUILTIN["black"].flash_primary_color == nltl_values.color("art.primary")
+    assert BUILTIN["black"].flash_secondary_color == nltl_values.color("art.secondary")
 
 
 def test_no_config_path_uses_builtin_directly():
     resolved = config.resolve_palette("violet", None)
     assert resolved.name == "violet"
+
+
+def test_grey_palette_mirrors_black_on_bg_light():
+    grey = BUILTIN["grey"]
+    assert grey.background_color == nltl_values.color("art.bg-light")
+    assert grey.outline_color == nltl_values.color("art.canvas")
+    assert grey.flash_primary_color == nltl_values.color("art.primary")
+    assert grey.flash_secondary_color == nltl_values.color("art.secondary")
+
+
+def test_backgrounds_come_from_nltl_values_art_group():
+    assert BUILTIN["black"].background_color == nltl_values.color("art.bg-dark")
+    assert BUILTIN["violet"].background_color == nltl_values.color("art.canvas")
+    assert BUILTIN["teal"].background_color == nltl_values.color("art.canvas")
+
+
+def test_every_art_color_is_used_by_a_builtin_palette():
+    used = {
+        value
+        for p in BUILTIN.values()
+        for value in (
+            p.background_color,
+            p.outline_color,
+            p.flash_primary_color,
+            p.flash_secondary_color,
+        )
+    }
+    art = {v for k, v in nltl_values.colors().items() if k.startswith("art.")}
+    assert art <= used

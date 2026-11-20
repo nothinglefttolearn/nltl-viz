@@ -10,11 +10,12 @@
 presets:
   - name: my-preset
     description: Custom motion tuning for NLTL releases
-    motion: deform                # deform | rigid | pulse — there is no --motion flag, this is the only place it's chosen
+    motion: deform                # deform | rigid | pulse | split — there is no --motion flag, this is the only place it's chosen
     band_count: 32                # number of frequency bands distributed around the perimeter
     deform_amplitude: 0.35        # motion: deform only: how far the outline pushes out at max energy (0 = no push)
     scale_amplitude: 0.20         # motion: rigid only: how much the whole shape scales up/down with loudness (0 = static size)
     pulse_max_opacity: 0.85       # motion: pulse only: opacity ceiling at max loudness (floor is always 0)
+    split_amplitude: 0.28         # motion: split only: how far each half slides, as a fraction of the canvas, at max loudness (0 = no slide)
     smoothing_attack: 0.03        # seconds — EMA time constant when the driving signal is rising
     smoothing_release: 0.25       # seconds — EMA time constant when the driving signal is falling
     onset_sensitivity: 1.0        # higher = more onsets detected (more flashes) — unused by motion: pulse, which has no flash
@@ -27,7 +28,7 @@ presets:
 palettes:
   - name: my-palette
     description: Custom color scheme for NLTL releases
-    background_color: "#0A0A0C"       # flat background color (non-reactive)
-    outline_color: "#D8D8D2"          # shape's color: stroke (deform), solid fill (rigid), or opacity-pulsed solid fill (pulse)
+    background_color: "#141414"       # flat background color (non-reactive)
+    outline_color: "#D8D8D2"          # shape's color: stroke (deform, split), solid fill (rigid), or opacity-pulsed solid fill (pulse); unused with --image
     flash_primary_color: "#DFA4E3"    # reactive element's color when spectral centroid is bass-heavy (or the only flash color, if flash_secondary_color is unset)
     flash_secondary_color: "#879B87"  # optional — reactive element's color when spectral centroid is treble-heavy. Omit for a monochrome flash (flash_primary_color only, no centroid lerp)

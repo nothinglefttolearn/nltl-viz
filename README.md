@@ -1,6 +1,6 @@
 # nltl-viz
 
-A CLI tool for generating audio-reactive music visualization video clips from a short audio file. Fully generative — no image input. The chosen shape (the NLTL face, or NLTL space — its inverse) reacts to the track according to its preset's motion style — see [Motion styles](#motion-styles) below. Preset (motion tuning), palette (color), and layout (single shape or a 2x2 grid of four) are independent settings that combine freely — see [Presets, palettes, and layout](#presets-palettes-and-layout).
+A CLI tool for generating audio-reactive music visualization video clips from a short audio file. By default it's fully generative: the chosen NLTL shape (from [nltl-values](https://github.com/nothinglefttolearn/nltl-values)) reacts to the track according to its preset's motion style — see [Motion styles](#motion-styles) below. Preset (motion tuning), palette (color), and layout (single shape or a 2x2 grid of four) are independent settings that combine freely — see [Presets, palettes, and layout](#presets-palettes-and-layout). Pass `--image` to animate your own picture instead of the shape — see [Image input](#image-input).
 
 Point it at a video file instead of an audio file and it switches to overlay mode: the same visualization, transparent everywhere except the shape/flash, composited on top of the video using the video's own audio track for analysis.
 
@@ -40,6 +40,9 @@ nltl-viz --config nltl-viz.yaml --preset my-preset --palette my-palette demo.wav
 # Render the inverse shape, NLTL space
 nltl-viz --shape space demo.wav
 
+# Animate a picture instead of the shape
+nltl-viz --image cover.jpg demo.wav
+
 # Overlay onto a video file instead — same flags, auto-detected by extension
 nltl-viz --preset aggressive --palette teal performance.mp4
 
@@ -47,7 +50,7 @@ nltl-viz --preset aggressive --palette teal performance.mp4
 nltl-viz
 ```
 
-Motion (`deform`/`rigid`/`pulse`) isn't a flag — it comes from whichever preset you pick. Run `nltl-viz presets` to see each preset's motion, and `nltl-viz palettes` to see each palette's colors.
+Motion (`deform`/`rigid`/`pulse`/`split`) isn't a flag — it comes from whichever preset you pick. Run `nltl-viz presets` to see each preset's motion, and `nltl-viz palettes` to see each palette's colors.
 
 Output files are saved alongside the input file, named `{name}_viz_{timestamp}.mp4` for an audio input (or `{name}_viz_preview_{timestamp}.mp4` for `--preview`), and `{name}_viz-overlay_{timestamp}.mp4` for a video input (`{name}_viz-overlay_preview_{timestamp}.mp4` for `--preview`) — each render gets its own file so re-running with different settings never overwrites a previous output.
 
@@ -55,10 +58,11 @@ Output files are saved alongside the input file, named `{name}_viz_{timestamp}.m
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--preset`, `-p` | `industrial` | Motion-tuning preset — also determines motion (`deform`/`rigid`/`pulse`), see below |
+| `--preset`, `-p` | `industrial` | Motion-tuning preset — also determines motion (`deform`/`rigid`/`pulse`/`split`), see below |
 | `--palette` | `black` | Color palette — background, outline, and flash colors |
 | `--layout` | `single` | Canvas arrangement: `single` shape, or a 2x2 `grid` of four identical copies |
-| `--shape` | `face` | Shape to visualize: `face` or `space` (its inverse) |
+| `--shape` | `face` | Shape to visualize: `face`, `space`, `face2`, `space2`, `face3`, `space3` — see [Shapes](#shapes) |
+| `--image`, `-i` | — | Picture file to animate instead of a shape — can't be combined with `--shape` |
 | `--preview` | `false` | Render a 10s low-quality preview to check the look |
 | `--output-dir`, `-o` | same as input | Where to write the output file |
 | `--config`, `-c` | — | YAML file with custom presets and/or palettes |
@@ -76,19 +80,20 @@ Preset (motion tuning), palette (color), and layout (canvas arrangement) are ind
 | `subtle` | `deform` | Calmer, slower breathing, lighter grain/vignette |
 | `aggressive` | `deform` | Punchier deform and flash, faster attack, heavier grain/vignette |
 
-Run `nltl-viz presets` to list them (with their motion). A preset's own `motion` field is what a `--config` YAML entry uses to select `deform`/`rigid`/`pulse` — see `nltl-viz.yaml.example`.
+Run `nltl-viz presets` to list them (with their motion). A preset's own `motion` field is what a `--config` YAML entry uses to select `deform`/`rigid`/`pulse`/`split` — see `nltl-viz.yaml.example`.
 
 ### Palettes
 
 | Name | Description |
 |------|--------------|
-| `black` | Dark background, off-white outline, flash lerps NLTL primary to secondary by spectral centroid |
-| `violet` | Neutral off-white background, NLTL primary color (nltl-values `primary`) outline and flash |
-| `teal` | Neutral off-white background, NLTL secondary color (nltl-values `secondary`) outline and flash |
+| `black` | Dark background (`art.bg-dark`), off-white outline, flash lerps NLTL primary to secondary by spectral centroid |
+| `grey` | Mid warm-grey background (`art.bg-light`), canvas outline (`art.canvas`), flash lerps NLTL primary to secondary |
+| `violet` | Warm canvas background (`art.canvas`), NLTL primary (`art.primary`) outline and flash |
+| `teal` | Warm canvas background (`art.canvas`), NLTL secondary (`art.secondary`) outline and flash |
 
-`black` is the only palette with a two-color (duotone) flash — `violet`/`teal` are monochrome: one accent color throughout, no centroid-driven lerp. Run `nltl-viz palettes` to list them.
+`black` and `grey` have a two-color (duotone) flash — `violet`/`teal` are monochrome: one accent color throughout, no centroid-driven lerp. Run `nltl-viz palettes` to list them.
 
-The brand colors and the `face`/`space` shape coordinates come from [nltl-values](https://github.com/nothinglefttolearn/nltl-values), pinned to a release tag in `pyproject.toml` — change them there, not here. Background colors are still defined locally in `palette.py`.
+All NLTL colors and every shape's coordinates come from [nltl-values](https://github.com/nothinglefttolearn/nltl-values)' `art` color group and shapes, pinned to a release tag in `pyproject.toml` — change them there, not here. The one local color is `black`'s cool-grey outline (`#D8D8D2`).
 
 ### Layout
 
@@ -103,6 +108,10 @@ Copy `nltl-viz.yaml.example` to `nltl-viz.yaml` and edit the values — see that
 
 - `face` (default) — the NLTL face, inscribed in a bounding square with the intentional blank space to its right preserved.
 - `space` — the same bounding square minus the NLTL face: the complementary shape, sharing the face's diagonal and short vertical edge as its own boundary.
+- `face2` / `space2` — a narrow right-hand column with a diagonal top edge, and its complement.
+- `face3` / `space3` — a scalene triangle along the square's top edge, and its complement.
+
+Each pair tiles the bounding square exactly. Only shapes listed here can be chosen — a shape that is new in nltl-values gets added after it has been checked under every motion.
 
 ## Motion styles
 
@@ -111,12 +120,26 @@ Motion isn't a flag — each preset's `motion` field fixes which one it uses (se
 - `deform` — the chosen shape's perimeter is divided into 32 frequency bands, distributed proportionally to each edge's actual length (so the long edges get more control points than the short ones), smoothed frame-to-frame with an attack/release envelope so the shape breathes rather than vibrates, and interpolated into one continuous deformed outline. The shape deforms outward/inward from its own centroid, not the canvas center, so it stays recognizable as it moves.
 - `rigid` — the shape's proportions never distort; instead the whole shape scales uniformly larger and smaller around its own centroid, driven by the track's overall loudness (an RMS envelope, smoothed the same way as the band energies). The outer shape is a solid flat fill instead of a stroked outline, and the reactive element is a smaller solid-filled concentric copy of the same shape instead of a soft gradient — flat, hard-edged regions throughout, no gradients.
 - `pulse` — the shape is drawn at a genuinely constant size and proportion (no deform, no scale animation), inscribed edge-to-edge in the frame's shorter dimension rather than `deform`/`rigid`'s smaller centered scale. The only reactive element is the fill's own opacity, driven directly by the same overall-loudness envelope `rigid` uses for scale — floor 0%, ceiling always below 100% (`pulse_max_opacity`). No flash, no bass/treble color blend — one flat color (`outline_color`) throughout.
+- `split` — the plain, undistorted shape is cut along the horizontal midline of its bounding square; the top half slides left and the bottom half slides right as loudness rises (`split_amplitude`), snapping back flush when quiet. Stroked outline, no flash.
+
+## Image input
+
+`--image FILE` animates a picture of your own in place of the NLTL shape. Any common format works (PNG, JPEG, WebP, …); phone photos are rotated according to their EXIF orientation, animated files use their first frame, and transparency is respected — a cut-out PNG reads as a silhouette, a JPEG as a rectangle.
+
+The picture is fitted (aspect preserved) into the same square the shape would occupy, so every preset behaves the same with either. Each motion keeps its meaning:
+
+- `deform` — the picture's rectangle is the perimeter: bands are spread around its edge, and the picture warps radially from its centre. The flash is drawn on top of the picture, only where the picture is.
+- `rigid` — the picture scales with loudness; the flash is a smaller flash-colored silhouette of the picture.
+- `pulse` — the picture fills the shorter frame dimension, its opacity driven by loudness.
+- `split` — the picture is cut at its midline and the halves slide apart.
+
+The picture's own pixels take the place of the palette's outline color; the palette still sets the background and flash colors. `--image` works in audio-only and video overlay mode, but not in interactive mode, and can't be combined with `--shape`.
 
 ## How it reacts to audio
 
 - Each detected onset (a "hit") triggers the reactive element (a soft gradient blob in `deform`, a smaller solid copy of the shape in `rigid`) with a fixed-duration decay; a harder hit is brighter/larger, but every flash fades at the same rate. `pulse` has no onset-triggered flash at all.
 - Its color is a live blend between the palette's `flash_primary_color` and `flash_secondary_color`, driven by the track's spectral centroid — bass-heavy moments skew toward the primary color, treble-heavy moments skew toward the secondary. A palette with no `flash_secondary_color` (e.g. `violet`, `teal`) is monochrome — the flash stays the primary color regardless of centroid. `pulse` uses neither — it's one flat `outline_color` throughout.
-- Grain and vignette are applied as a post-process over every frame (no image input, no desaturation pass — the palette is deliberately muted already).
+- Grain and vignette are applied as a post-process over every frame (no desaturation pass — the palette is deliberately muted already).
 
 ## Video overlay
 

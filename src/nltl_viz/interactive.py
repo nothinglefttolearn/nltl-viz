@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import nltl_values
 import questionary
 
 from nltl_viz import palette as palette_mod
 from nltl_viz import preset as preset_mod
+from nltl_viz.render import Shape
 
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".aiff", ".aif", ".ogg", ".m4a"}
 
@@ -43,7 +45,8 @@ def run() -> Choices:
 
     preset_choices = [
         questionary.Choice(
-            title=f"{name} — {preset_mod.get(name).description} [{preset_mod.get(name).motion}]", value=name
+            title=f"{name} — {preset_mod.get(name).description} [{preset_mod.get(name).motion}]",
+            value=name,
         )
         for name in preset_mod.names()
     ]
@@ -68,8 +71,10 @@ def run() -> Choices:
         raise RuntimeError("cancelled")
 
     shape_choices = [
-        questionary.Choice(title="face — the NLTL face", value="face"),
-        questionary.Choice(title="space — the NLTL space (the face's inverse)", value="space"),
+        questionary.Choice(
+            title=f"{s.value} — {nltl_values.shape(s.value).description}", value=s.value
+        )
+        for s in Shape
     ]
     shape_answer = questionary.select("Shape", choices=shape_choices).ask()
     if shape_answer is None:

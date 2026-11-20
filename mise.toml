@@ -9,14 +9,27 @@ _.python.venv = { path = ".venv", create = true }
 [settings]
 python.uv_venv_auto = true
 
+# Each task does one thing so CI can run them as separate, individually
+# logged steps (`mise run --skip-deps <task>`). `depends` only exists for
+# local convenience: `mise run test` syncs first, `mise run ci` runs it all.
+
+[tasks.setup]
+description = "Install the system libraries pycairo builds against (Homebrew on macOS, apt on Linux)"
+run = '''
+case "$(uname -s)" in
+  Darwin) brew bundle ;;
+  Linux) sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config ;;
+  *) echo "Unsupported OS: install Cairo and pkg-config yourself" >&2; exit 1 ;;
+esac
+'''
+
 [tasks.sync]
 description = "Install runtime + dev dependencies"
 run = "uv sync --group dev"
 
-[tasks.test]
-description = "Run tests (pass pytest args after --, e.g. -- tests/test_ema.py)"
-depends = ["sync"]
-run = "uv run pytest"
+[tasks."lock:check"]
+description = "Fail if uv.lock is out of date with pyproject.toml"
+run = "uv lock --check"
 
 [tasks.lint]
 description = "Lint with ruff"
@@ -28,11 +41,21 @@ description = "Format with ruff"
 depends = ["sync"]
 run = "uv run ruff format ."
 
+[tasks."fmt:check"]
+description = "Fail if any file isn't ruff-formatted"
+depends = ["sync"]
+run = "uv run ruff format --check ."
+
+[tasks.test]
+description = "Run tests (pass pytest args after --, e.g. -- tests/test_ema.py)"
+depends = ["sync"]
+run = "uv run pytest"
+
+[tasks.ci]
+description = "Run every CI check locally, in one go"
+depends = ["lock:check", "lint", "fmt:check", "test"]
+
 [tasks.viz]
 description = "Run nltl-viz (e.g. mise run viz -- --preview demo.wav)"
 depends = ["sync"]
 run = "uv run nltl-viz"
-
-[tasks.setup]
-description = "Install system libraries (Cairo, pkgconf) via Homebrew"
-run = "brew bundle"

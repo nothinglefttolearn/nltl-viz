@@ -1,5 +1,6 @@
 import nltl_values
 import numpy as np
+import pytest
 
 from nltl_viz.render import (
     Shape,
@@ -166,3 +167,15 @@ def test_scaled_polygon_points_below_one_shrinks_toward_centroid():
     plain_dist = np.hypot(*(vertices - centroid_arr).T)
     scaled_dist = np.hypot(*(points - centroid_arr).T)
     assert np.all(scaled_dist < plain_dist)
+
+
+def test_every_shape_choice_exists_in_nltl_values():
+    assert {s.value for s in Shape} <= set(nltl_values.shape_names())
+
+
+@pytest.mark.parametrize("shape", list(Shape))
+def test_every_shape_deforms_without_error(shape):
+    band_values = np.linspace(0.0, 1.0, 8)
+    points, centroid = deformed_polygon_points(band_values, 300, 0.3, shape)
+    assert np.isfinite(points).all()
+    assert 0 < centroid[0] < 300 and 0 < centroid[1] < 300

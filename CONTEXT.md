@@ -9,15 +9,27 @@ The motion-tuning axis: a named set of amplitude, timing, onset, and post-fx num
 _Avoid_: style, look (too vague — a Preset is specifically motion tuning, not the whole visual identity)
 
 **Palette**:
-The color axis: a named or custom accent-color scheme (background, outline, and flash colors) chosen via `--palette`, independent of a Preset's motion tuning. The built-in `black` palette keeps a two-color (primary→secondary, from nltl-values) flash lerp by spectral centroid; other built-in palettes are single-accent — monochrome, no lerp.
+The color axis: a named or custom accent-color scheme (background, outline, and flash colors) chosen via `--palette`, independent of a Preset's motion tuning. NLTL colors (accents and backgrounds) come only from nltl-values' `art` group, never `brand` or `web`. The built-in `black` and `grey` palettes keep a two-color (primary→secondary) flash lerp by spectral centroid; other built-in palettes are single-accent — monochrome, no lerp.
 _Avoid_: theme, colorway, scheme
 
 **Layout**:
 The canvas-arrangement axis, chosen via `--layout`: `single` (one shape centered in the frame) or `grid` (frame split into a fixed 2×2 with 4 identical copies of the shape, all driven by the same full-spectrum signal — not a spectral split per quadrant). Independent of Preset and Palette.
 _Avoid_: arrangement, mode
 
+**Subject**:
+What a Motion animates in a render: either a Shape or an Image. Every render has exactly one Subject. Changing the Subject doesn't change what a Motion means: `deform` still distorts, `rigid` still scales, and so on, whatever it's applied to.
+_Avoid_: source (that word is reserved for overlay mode's source video), input (audio and video are inputs too), target
+
+**Image** (a Subject):
+A raster picture file supplied by the user, animated in place of a Shape. When an Image is the Subject, no Shape is drawn.
+_Avoid_: picture, texture, sprite
+
+**Shape** (a Subject):
+The NLTL polygon being animated, chosen via `--shape`, with its geometry taken from nltl-values. Shapes come in complementary pairs that tile the unit square together: `face`/`space`, `face2`/`space2`, `face3`/`space3`. Only shapes nltl-viz explicitly lists can be chosen. A shape that is new in nltl-values isn't available until it's added here.
+_Avoid_: polygon, logo, mark (as names for this axis)
+
 **Motion**:
-How the shape (see `nltl-viz/src/nltl_viz/render.py`'s `Shape`) responds to audio over time. Fixed per preset — not a separate flag — since a preset's amplitude/opacity fields only make sense together with the one Motion they were tuned for.
+How the Shape responds to audio over time. Fixed per preset — not a separate flag — since a preset's amplitude/opacity fields only make sense together with the one Motion they were tuned for.
 _Avoid_: animation style, effect (as generic synonyms — name the Motion)
 
 **Pulse** (a Motion):
